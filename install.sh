@@ -18,5 +18,5 @@ python3 -m venv env
 . env/bin/activate
 
 # pyton packages
-pip3 install pylint autopep8 matplotlib gym torch torchvision numpy tensorboard
+pip3 install pylint autopep8 matplotlib gym torch torchvision numpy tensorboard pystan Box2D pyglet==1.2.4 gym[atari] pybullet
 
