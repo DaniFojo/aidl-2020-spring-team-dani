@@ -1,9 +1,9 @@
 import ppo
 if __name__ == "__main__":
-    train = False
+    train = True
     if train :
         env = ppo.train(environment_name="CartPole-v0",
-                solved_reward=200,
+                solved_reward=199,
                 gamma=0.99,
                 clip_ratio=0.2,
                 pi_lr=0.000_3,  # Learning rate for policy optimizer.

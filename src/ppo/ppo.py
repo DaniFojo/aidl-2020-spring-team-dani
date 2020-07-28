@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
+import numpy as np
 
 from torch.utils.tensorboard import SummaryWriter
 from torch.distributions import Categorical
@@ -48,7 +49,7 @@ class Memory:
 class Actor(nn.Module):
     def __init__(self, num_of_observations, posibles_actions, hidden_size=actor_hidden_size):
         super(Actor, self).__init__()
-
+        self.num_of_observations = num_of_observations
         self.actor = nn.Sequential(
             nn.Linear(num_of_observations, hidden_size),
             nn.Tanh(),
@@ -65,7 +66,7 @@ class Actor(nn.Module):
     def act(self, state, memory):
         state = torch.from_numpy(state).float().to(device)
 
-        probs = self.forward(state)
+        probs = self.forward(state.flatten())
 
         dist = Categorical(probs)
         action = dist.sample()
@@ -75,7 +76,7 @@ class Actor(nn.Module):
         memory.actions.append(action)
         memory.logprobs.append(logprobs)
         return action.item()
-    
+
     def play(self, state):
         state = torch.from_numpy(state).float().to(device)
         probs = self.forward(state)
@@ -87,6 +88,7 @@ class Actor(nn.Module):
 class Critic(nn.Module):
     def __init__(self, num_of_observations, posibles_actions, hidden_size=critic_hidden_size):
         super(Critic, self).__init__()
+        self.num_of_observations = num_of_observations
         self.critic = nn.Sequential(
             nn.Linear(num_of_observations, hidden_size),
             nn.Tanh(),
@@ -100,12 +102,12 @@ class Critic(nn.Module):
         return probs
 
     def evaluate(self, state, action, actor):
+        state = state.reshape((-1, self.num_of_observations))
         action_probs = actor(state)
         dist = Categorical(action_probs)
 
         action_logprobs = dist.log_prob(action)
         dist_entropy = dist.entropy()
-
         state_value = self.critic(state)
 
         return action_logprobs, torch.squeeze(state_value), dist_entropy
@@ -123,6 +125,8 @@ class PPO:
                  gamma=gamma,
                  k_epochs=k_epochs,
                  clip_ratio=clip_ratio,
+                 previousTrainedPolicy=None,
+                 previousTrainedCritic=None,
                  ):
         # Current
         self.actor = Actor(num_of_observations=num_of_observations,
@@ -130,11 +134,17 @@ class PPO:
         self.critic = Critic(num_of_observations=num_of_observations,
                              posibles_actions=posibles_actions, hidden_size=critic_hidden_size).to(device)
 
+        if previousTrainedPolicy:
+            self.actor.load_state_dict(previousTrainedPolicy)
+        if previousTrainedCritic:
+            self.critic.load_state_dict(previousTrainedCritic)
+
         # Old
         self.actor_old = Actor(num_of_observations=num_of_observations,
                                posibles_actions=posibles_actions, hidden_size=actor_hidden_size).to(device)
         self.critic_old = Critic(num_of_observations=num_of_observations,
                                  posibles_actions=posibles_actions, hidden_size=critic_hidden_size).to(device)
+
         self.actor_old.load_state_dict(self.actor.state_dict())
         self.critic_old.load_state_dict(self.critic.state_dict())
 
@@ -165,7 +175,6 @@ class PPO:
 
             # Finding the ratio (pi_theta / pi_theta__old):
             ratios = torch.exp(logprobs - old_logprobs)
-            
 
             # Finding Surrogate Loss:
             advantages = rewards - state_values.detach()
@@ -204,6 +213,14 @@ class PPO:
         return returns
 
 
+def prodOfTupple(val):
+    val = list(val)
+    res = 1
+    for ele in val:
+        res *= ele
+    return res
+
+
 def train(environment_name,
           solved_reward,
           gamma=0.95,
@@ -218,18 +235,27 @@ def train(environment_name,
           actor_hidden_size=32,
           render=False,
           random_seed=None,
-          posibles_actions=None):
+          posibles_actions=None,
+          pathForBasePolicyToTrain=None,
+          pathForBaseCriticToTrain=None,):
 
+    previousTrainedPolicy = None
+    if pathForBasePolicyToTrain:
+        previousTrainedPolicy = torch.load(pathForBasePolicyToTrain)
+
+    previousTrainedCritic = None
+    if pathForBaseCriticToTrain:
+        previousTrainedCritic = torch.load(pathForBaseCriticToTrain)
 
     # logging variables
     running_reward = 0
     avg_length = 0
     log_interval = 10
 
-
     # Environment
     env = gym.make(environment_name)
-    num_of_observations = env.observation_space.shape[0]
+
+    num_of_observations = prodOfTupple(env.observation_space.shape)
     if (posibles_actions == None):
         posibles_actions = env.action_space.n
 
@@ -254,12 +280,15 @@ def train(environment_name,
               vf_lr=vf_lr,
               gamma=gamma,
               k_epochs=k_epochs,
-              clip_ratio=clip_ratio)  # use hyperparametres
+              clip_ratio=clip_ratio,
+              previousTrainedPolicy=previousTrainedPolicy,
+              previousTrainedCritic=previousTrainedCritic)
+    # use hyperparametres
 
     for i_episode in range(1, max_episode_length+1):
         state = env.reset()
         for t in range(1, max_steps + 1):
-            timestep +=1
+            timestep += 1
             # Running policy_old:
             action = ppo.actor_old.act(state, memory)
             state, reward, done, _ = env.step(action)
@@ -289,40 +318,44 @@ def train(environment_name,
                 i_episode, int(avg_length/log_interval), int((running_reward/log_interval))))
             running_reward = 0
             avg_length = 0
-    
-        x = int((running_reward/log_interval))            
+
+        x = int((running_reward/log_interval))
         if solved_reward < x:
             print("-----> goal archived, stop the training")
             break
 
-    
     print("End training")
-    torch.save(ppo.actor_old.state_dict(), './model/ppo_{}_latest.pth'.format(environment_name))
+    torch.save(ppo.actor_old.state_dict(),
+               './model/ppo_{}_policy_latest.pth'.format(environment_name))
+    torch.save(ppo.critic_old.state_dict(),
+               './model/ppo_{}_critic_latest.pth'.format(environment_name))
     return ppo
-    
+
+
 def play_latest(environment_name, size):
-       
 
     env = gym.make(environment_name)
-    num_of_observations = env.observation_space.shape[0]
+    num_of_observations = prodOfTupple(env.observation_space.shape)
+
     posibles_actions = env.action_space.n
     state = env.reset()
-    
-    actor = Actor(num_of_observations, posibles_actions, hidden_size=size).to(device)
-    actor.load_state_dict(torch.load('./model/ppo_{}_latest.pth'.format(environment_name)))
-    
+
+    actor = Actor(num_of_observations, posibles_actions,
+                  hidden_size=size).to(device)
+    actor.load_state_dict(torch.load(
+        './model/ppo_{}_policy_latest.pth'.format(environment_name)))
+
     done = False
-    total_reward = 0    
+    total_reward = 0
     torch.backends.cudnn.deterministic = False
     torch.backends.cudnn.benchmark = True
-    
+
     while (not done):
+        state = np.ndarray.flatten(state)
         action = actor.play(state)
         state, reward, done, _ = env.step(action)
         env.render()
         total_reward += reward
-    
+
     env.close()
     print("total reward {}".format(total_reward))
-    
-        
