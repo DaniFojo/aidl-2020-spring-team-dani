@@ -21,6 +21,9 @@ max_steps = 500
 critic_hidden_size = 32
 actor_hidden_size = 32
 render = False
+eps = np.finfo(np.float32).eps.item()  # machine epsilon
+coeficient_entropy = 0.01
+coeficient_value = 0.5
 
 
 # Setup device
@@ -149,8 +152,10 @@ class PPO:
         self.critic_old.load_state_dict(self.critic.state_dict())
 
         # Optimizers
-        self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=pi_lr)
-        self.actor_critic = optim.Adam(self.critic.parameters(), lr=vf_lr)
+        #self.actor_optimizer = optim.Adam(list(
+        #    self.actor.parameters()) + list(self.critic.parameters()), lr=pi_lr, eps=eps)
+        self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=pi_lr, eps=eps)
+        self.actor_critic = optim.Adam(self.critic.parameters(), lr=vf_lr, eps=eps)
 
         # Save parameters
         self.gamma = gamma
@@ -181,8 +186,9 @@ class PPO:
             surr1 = ratios * advantages
             surr2 = torch.clamp(ratios, 1 - self.clip_ratio,
                                 1+self.clip_ratio) * advantages
-            loss = -torch.min(surr1, surr2) + 0.5 * \
-                self.MseLoss(state_values, rewards) - 0.01 * dist_entropy
+            loss = -torch.min(surr1, surr2) + coeficient_value * \
+                self.MseLoss(state_values, rewards) - \
+                coeficient_entropy * dist_entropy
 
             # take gradient step
             self.actor_optimizer.zero_grad()
@@ -209,7 +215,7 @@ class PPO:
 
         # Normalizing the returns:
         returns = torch.tensor(returns, dtype=torch.float32).to(device)
-        returns = (returns - returns.mean()) / (returns.std() + 1e-5)
+        returns = (returns - returns.mean()) / (returns.std() + eps)
         return returns
 
 
@@ -323,12 +329,18 @@ def train(environment_name,
         if solved_reward < x:
             print("-----> goal archived, stop the training")
             break
-
+        if i_episode % 10_000 == 0:
+            numK = i_episode / 1_000
+            torch.save(ppo.actor_old.state_dict(),
+                       './model/ppo_{}_policy_{}K.pth'.format(environment_name, numK))
+            torch.save(ppo.critic_old.state_dict(),
+                       './model/ppo_{}_critic_{}K.pth'.format(environment_name, numK))
     print("End training")
     torch.save(ppo.actor_old.state_dict(),
                './model/ppo_{}_policy_latest.pth'.format(environment_name))
     torch.save(ppo.critic_old.state_dict(),
                './model/ppo_{}_critic_latest.pth'.format(environment_name))
+    env.close()
     return ppo
 
 
@@ -349,10 +361,13 @@ def play_latest(environment_name, size):
     total_reward = 0
     torch.backends.cudnn.deterministic = False
     torch.backends.cudnn.benchmark = True
-
+    i = 0
     while (not done):
         state = np.ndarray.flatten(state)
         action = actor.play(state)
+        print("---->", i, "---->", action)
+        i = i + 1
+
         state, reward, done, _ = env.step(action)
         env.render()
         total_reward += reward
