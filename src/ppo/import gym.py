@@ -4,10 +4,11 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 import numpy as np
-import time
 
 from torch.utils.tensorboard import SummaryWriter
 from torch.distributions import Categorical
+from torch.autograd import Variable
+
 
 
 # Hyper parameters
@@ -19,30 +20,17 @@ k_epochs = 4
 update_every_j_timestep = 50
 max_episode_length = 1_000
 max_steps = 500
-critic_hidden_size = 256
-actor_hidden_size = 16
+critic_hidden_size = 32
+actor_hidden_size = 32
 render = False
-# eps = np.finfo(np.float32).eps.item()  # machine epsilon
-eps = 1e-5
+eps = np.finfo(np.float32).eps.item()  # machine epsilon
 coeficient_entropy = 0.01
 coeficient_value = 0.5
-lmbda = 0.95
+
 
 
 # Setup device
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-# inicializers
-
-
-def init_normal(m):
-    if type(m) == nn.Linear:
-        nn.init.uniform_(m.weight)
-
-
-def init_orthogonal(m):
-    if type(m) == nn.Linear:
-        nn.init.orthogonal_(m.weight)
 
 # Memory
 
@@ -71,12 +59,11 @@ class Actor(nn.Module):
         self.actor = nn.Sequential(
             nn.Linear(num_of_observations, hidden_size),
             nn.Tanh(),
-            nn.Linear(hidden_size, hidden_size),
+            nn.Linear(hidden_size, hidden_size//2),
             nn.Tanh(),
-            nn.Linear(hidden_size, posibles_actions),
+            nn.Linear(hidden_size // 2, posibles_actions),
             nn.Softmax(dim=-1)
         )
-        self.actor.apply(init_orthogonal)
 
     def forward(self, x):
         probs = self.actor(x)
@@ -111,11 +98,10 @@ class Critic(nn.Module):
         self.critic = nn.Sequential(
             nn.Linear(num_of_observations, hidden_size),
             nn.Tanh(),
-            nn.Linear(hidden_size, hidden_size),
+            nn.Linear(hidden_size, hidden_size//2),
             nn.Tanh(),
-            nn.Linear(hidden_size, 1),
+            nn.Linear(hidden_size//2, 1),
         )
-        self.critic.apply(init_orthogonal)
 
     def forward(self, x):
         probs = self.actor(x)
@@ -147,8 +133,6 @@ class PPO:
                  clip_ratio=clip_ratio,
                  previousTrainedPolicy=None,
                  previousTrainedCritic=None,
-                 actorGradientNormalization=0,
-                 observationNormalization=False
                  ):
         # Current
         self.actor = Actor(num_of_observations=num_of_observations,
@@ -171,23 +155,21 @@ class PPO:
         self.critic_old.load_state_dict(self.critic.state_dict())
 
         # Optimizers
-        self.actor_optimizer = optim.Adam(
-            self.actor.parameters(), lr=pi_lr, weight_decay=2.5e-4,  eps=eps, betas=(0.99, 0.999))
-        self.actor_critic = optim.Adam(
-            self.critic.parameters(), lr=vf_lr, weight_decay=2.5e-4, eps=eps, betas=(0.99, 0.999))
+        #self.actor_optimizer = optim.Adam(list(
+        #    self.actor.parameters()) + list(self.critic.parameters()), lr=pi_lr, eps=eps)
+        self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=pi_lr, eps=eps)
+        self.actor_critic = optim.Adam(self.critic.parameters(), lr=vf_lr, eps=eps)
 
         # Save parameters
         self.gamma = gamma
         self.k_epochs = k_epochs
         self.clip_ratio = clip_ratio
         self.environment_name = environment_name
-        self.actorGradientNormalization = actorGradientNormalization
-        self.observationNormalization = observationNormalization
-
         # Loss
-        self.mseLoss = nn.MSELoss()
+        self.MseLoss = nn.MSELoss()
 
-    def update(self, memory, writer):
+    def update(self, memory):
+        rewards, v_target = self.compute_returns(self.gamma, memory)
 
         # convert list to tensor
         old_states = torch.stack(memory.states).to(device).detach()
@@ -196,41 +178,36 @@ class PPO:
 
         for e in range(self.k_epochs):
             # Evaluating old actions and values :
-            logprobs, values, dist_entropy = self.critic.evaluate(
+            logprobs, state_values, dist_entropy = self.critic.evaluate(
                 old_states, old_actions, self.actor)
 
-            # GAE Compute rewards
-            rewards, advantages = self.gae(self.gamma, memory, values)
-
-            # Default compute rewards
-            #rewards, advantages = self.compute_returns(self.gamma, memory)
+            self.actor_critic.zero_grad()
+            vf_loss1 = torch.mean(torch.pow(state_values - v_target, 2))
+            vpredclipped = state_values + torch.clamp(state_values - v_target, 1 - self.clip_ratio,
+                                1+self.clip_ratio)
+            vf_loss2 = (vpredclipped - v_target).pow(2.)
+            value_loss = 0.5 * torch.max(vf_loss1, vf_loss2).mean()
+            value_loss.backward()
+            self.actor_critic.step()
+            
 
             # Finding the ratio (pi_theta / pi_theta__old):
             ratios = torch.exp(logprobs - old_logprobs)
 
+            # Finding Surrogate Loss:
+            advantages = rewards - state_values.detach()
             surr1 = ratios * advantages
             surr2 = torch.clamp(ratios, 1 - self.clip_ratio,
-                                1 + self.clip_ratio) * advantages
-            policy_loss = -torch.min(surr1, surr2)
-            value_loss = coeficient_value * self.mseLoss(values, rewards)
-            # entropy del critic or actor?
-            entropy = coeficient_entropy * dist_entropy
-            loss = policy_loss + value_loss - entropy
+                                1+self.clip_ratio) * advantages
+            loss = -torch.min(surr1, surr2) + coeficient_value * \
+                self.MseLoss(state_values.detach(), rewards) - \
+                coeficient_entropy * dist_entropy
 
-            writer.add_scalar("policy_loss", policy_loss.mean())
-            writer.add_scalar("value_loss", value_loss.mean())
-            writer.add_scalar("entropy", entropy.mean())
-            writer.add_scalar("loss", loss.mean())
-
+            # take gradient step
             self.actor_optimizer.zero_grad()
-            self.actor_critic.zero_grad()
             loss.mean().backward()
-            if (self.actorGradientNormalization != 0):
-                torch.nn.utils.clip_grad_norm_(
-                    self.actor.parameters(), self.actorGradientNormalization)
+            torch.nn.utils.clip_grad_norm_(self.actor.parameters(), 40)
             self.actor_optimizer.step()
-            self.actor_critic.step()
-
         # Copy new weights into old policy:
         self.actor_old.load_state_dict(self.actor.state_dict())
         self.critic_old.load_state_dict(self.critic.state_dict())
@@ -240,36 +217,18 @@ class PPO:
 
     def compute_returns(self, gamma, memory):
         R = 0
-
         returns = []
         for reward, is_terminal in zip(reversed(memory.rewards), reversed(memory.is_terminals)):
             if is_terminal:
                 R = 0
-            R = reward + gamma * R * lmbda
+            R = reward + gamma * R
             returns.insert(0, R)
 
         # Normalizing the returns:
         returns = torch.tensor(returns, dtype=torch.float32).to(device)
-        v_target = returns.clone()
+        v_target = torch.tensor(returns, dtype=torch.float32).to(device)
         returns = (returns - returns.mean()) / (returns.std() + eps)
         return returns, v_target
-
-    def gae(self, gamma, memory, v):
-        gae = 0
-        returns = []
-        adv = []
-        values = (v.data).cpu().numpy()
-        for reward, is_terminal, value in zip(reversed(memory.rewards), reversed(memory.is_terminals), reversed(values)):
-            mask = not is_terminal
-            delta = reward + gamma * value * mask - value
-            gae = delta + gamma * lmbda * mask * gae
-            returns.insert(0, gae + value)
-            adv.insert(0, gae)
-
-        adv = (adv - np.mean(adv)) / (np.std(adv) + eps)
-        returns = torch.tensor(returns, dtype=torch.float32).to(device)
-        adv = torch.tensor(adv, dtype=torch.float32).to(device)
-        return returns, adv
 
 
 def prodOfTupple(val):
@@ -278,10 +237,6 @@ def prodOfTupple(val):
     for ele in val:
         res *= ele
     return res
-
-
-def normalizeArray(data):
-    return (data - np.min(data)) / (np.max(data) - np.min(data))
 
 
 def train(environment_name,
@@ -294,15 +249,13 @@ def train(environment_name,
           update_every_j_timestep=50,
           max_episode_length=1_000,
           max_steps=500,
-          critic_hidden_size=256,
-          actor_hidden_size=16,
+          critic_hidden_size=32,
+          actor_hidden_size=32,
           render=False,
           random_seed=None,
           posibles_actions=None,
           pathForBasePolicyToTrain=None,
-          pathForBaseCriticToTrain=None,
-          observationNormalization=False,
-          actorGradientNormalization=0):
+          pathForBaseCriticToTrain=None,):
 
     previousTrainedPolicy = None
     if pathForBasePolicyToTrain:
@@ -347,20 +300,15 @@ def train(environment_name,
               k_epochs=k_epochs,
               clip_ratio=clip_ratio,
               previousTrainedPolicy=previousTrainedPolicy,
-              previousTrainedCritic=previousTrainedCritic,
-              observationNormalization=observationNormalization,
-              actorGradientNormalization=actorGradientNormalization)
+              previousTrainedCritic=previousTrainedCritic)
+    # use hyperparametres
 
-    startTime = time.time()
     for i_episode in range(1, max_episode_length+1):
         state = env.reset()
         for t in range(1, max_steps + 1):
             timestep += 1
-            # normalize state
-            # https://arxiv.org/pdf/2006.05990.pdf
-            if (observationNormalization):
-                state = normalizeArray(state)
             # Running policy_old:
+            
             action = ppo.actor_old.act(state, memory)
             state, reward, done, _ = env.step(action)
 
@@ -370,7 +318,7 @@ def train(environment_name,
 
             # update if its time
             if timestep % update_every_j_timestep == 0:
-                ppo.update(memory, writer)
+                ppo.update(memory)
 
             running_reward += reward
             if render:
@@ -385,12 +333,10 @@ def train(environment_name,
         writer.add_scalar('avg_length', int(avg_length/log_interval))
 
         if i_episode % log_interval == 0:
-            elapsedTime = time.time() - startTime
-            print('Episode {} \t avg length: {} \t avg reward: {} \t lapse time (ms): {}'.format(
-                i_episode, int(avg_length/log_interval), int((running_reward/log_interval)), elapsedTime * 1000))
+            print('Episode {} \t avg length: {} \t reward: {}'.format(
+                i_episode, int(avg_length/log_interval), int((running_reward/log_interval))))
             running_reward = 0
             avg_length = 0
-            startTime = time.time()
 
         x = int((running_reward/log_interval))
         if solved_reward < x:

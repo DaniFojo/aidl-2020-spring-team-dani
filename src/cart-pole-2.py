@@ -7,19 +7,21 @@ import math
 import numpy as np
 import collections
 from torch.utils.tensorboard import SummaryWriter
+from torch.distributions.categorical import Categorical
 writer = SummaryWriter('board/cart-pole')
 
-env = gym.make('CartPole-v1')
+env = gym.make('CartPole-v0')
 device = torch.device("cuda")
 
 num_of_observations = 4
-hidden_perceptrons = 16
+hidden_perceptrons = 256
 posibles_actions = 2
 
+gamma = 0.99
 lr = 0.000_1
 weight_decay = 0.000_05
-number_of_episodes = 150_000
-max_episode_length = 100
+number_of_episodes = 1_000
+max_episode_length = 500
 success_score = 195
 
 layers = collections.OrderedDict([
@@ -27,16 +29,18 @@ layers = collections.OrderedDict([
     ("relu_i", nn.ReLU()),
     ("hidden_1", nn.Linear(hidden_perceptrons, hidden_perceptrons)),
     ("relu_h1", nn.ReLU()),
-    ("classification", nn.Linear(hidden_perceptrons, posibles_actions))
+    ("dropout", nn.Dropout(0.5)),
+    ("classification", nn.Linear(hidden_perceptrons, posibles_actions)),
+    ("softmax", nn.Softmax())
 ])
 policy = nn.Sequential(layers).to(device)
+
 
 """
     Description:
         A pole is attached by an un-actuated joint to a cart, which moves along
         a frictionless track. The pendulum starts upright, and the goal is to
-        prevent it from falling over by increasing and reducing the cart's
-        velocity.
+        prevent it from falling over by increasing and reducing the cart'shttps://meet.google.com/muk-hgdy-zvy?authuser=0
     Source:
         This environment corresponds to the version of the cart-pole problem
         described by Barto, Sutton, and Anderson
@@ -71,9 +75,10 @@ policy = nn.Sequential(layers).to(device)
 """
 
 optimizer = optim.Adam(policy.parameters(), lr=lr, weight_decay=weight_decay)
-criterion = nn.MSELoss()
+#criterion = nn.MSELoss()
 number_of_consecutive_success = 0
 scores = []
+
 
 for i_episode in range(number_of_episodes):
     observation = env.reset()
@@ -83,72 +88,87 @@ for i_episode in range(number_of_episodes):
     batch_weights = []      # for R(tau) weighting in policy gradient
     batch_rets = []         # for measuring episode returns
     batch_lens = []         # for measuring episode lengths
+    batch_logprob = []
     score = 0
+    done = False
     for t in range(max_episode_length):
-        # env.render()
+        if (i_episode > 900):
+            env.render()
 
         # collect trajectory
         batch_obs.append(observation.copy())
         input = F.Tensor(observation).to(device)
+        input = input.unsqueeze(0)
 
-        predictionTorch = policy(input)
-        _, pred = predictionTorch.max(0)
-        action = pred.item()
+        p = policy(input)
+        dist = Categorical(probs=p)
+        predictionTorch = dist.sample()
+        batch_logprob.append(dist.log_prob(predictionTorch))
+
+        action = predictionTorch.item()
+
+        batch_acts.append(action)
         observation, reward, done, info = env.step(action)
-        batch_acts.append(predictionTorch.tolist())
         ep_rews.append(reward)
-        score = max(sum(ep_rews), score)
+
+        score = sum(ep_rews)
+        scores.append(score)
         if done:
             # if episode is over, record info about episode
             ep_ret, ep_len = sum(ep_rews), len(ep_rews)
             batch_rets.append(ep_ret)
             batch_lens.append(ep_len)
             batch_weights += [ep_ret] * ep_len
+            break
 
-            ep_rews = []
+    if i_episode % 20 == 0:
+        av = sum(scores)/len(scores)
+        writer.add_scalar('Score every 20 episodes ', av)
+        print("Episode: %i, score: %i, average: %f" % (
+            i_episode, score, av))
+        scores = []
+    else:
+        scores.append(score)
+    writer.add_scalar('score', score)
 
-    if i_episode % 100 == 0:
-        print("Episode: %i, score: %i" % (i_episode, score))
     policy.train()
 
-    l = F.Tensor(batch_acts).to(device)
-    # l = policy(F.Tensor(batch_obs).to(device))
+    # Reward total
+    G = 0
+    policy_loss = []
+    returns = []
 
-    # which gives the expected return if you start in state s, take an arbitrary action a
-    Q_pi = 0.5
-    # which gives the expected return if you start in state s and always act according to policy \pi:
-    # V^{\pi}(s) = \underE{\tau \sim \pi}{R(\tau)\left| s_0 = s\right.}
-    V_pi = sum(np.asarray(batch_weights)) / len(batch_weights)
-    # A^{\pi}(s,a) = Q^{\pi}(s,a) - V^{\pi}(s).
-    A_pi = Q_pi - V_pi
+    for r in ep_rews[::-1]:  # dirrecio contraria
+        G = r + gamma * G
+        returns.insert(0, G)
 
-    z = (1/max_episode_length) * sum(np.asarray(batch_weights))
-    # z aumenta si el score es mayour
+    returns = torch.tensor(returns)
+    # Normalize the rewards
+    returns = (returns - returns.mean()) / (returns.std() + 1e-7)
 
-    A_hat = F.Tensor(np.asarray(batch_weights) *
-                     A_pi * z).repeat(2).view(100, 2).to(device)
-    A_hat.requires_grad = True
+    obs = F.Tensor(batch_obs).to(device)
+    acts = F.Tensor(batch_acts).to(device)
+    weights = F.Tensor(batch_weights).to(device)
 
-    # loss = criterion(l, target)
-    loss = l.log_softmax(dim=1).mul(A_hat)
-    loss = criterion(loss, A_hat)
-    # weight = F.Tensor(batch_weights).to(device).repeat(2).reshape(-1, 2)
-    # loss = -(l * weight).mean()
-    # c = F.Tensor((Q_pi - np.asarray(batch_weights)) **                 2).to(device).repeat(2).reshape(-1, 2)
-    # target = l.mul(c).log()
-    # loss = -(target * weight).mean()
+    batch_loss = []
+    for log_prob, r in zip(batch_logprob, returns):
+        batch_loss.append(-log_prob * r)
+
+    logp = F.Tensor(batch_logprob).to(device)
+    loss = torch.stack(batch_loss).mean()
+
     loss.backward()
     optimizer.step()
     optimizer.zero_grad()
 
     policy.eval()
-
-    writer.add_scalar('score', score)
     scores.append(score)
 
     if (number_of_consecutive_success > 99):
         print("Episode %i: We have a model!!!" % (i_episode, ))
-        torch.save(policy.state_dict(), "./model/cart-pole.pth")
+        torch.save(policy.state_dict(), "../model/cart-pole.pth")
         break
 writer.close()
 env.close()
+
+torch.save(policy.state_dict(), "./model/cart-pole.pth")

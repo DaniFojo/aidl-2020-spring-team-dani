@@ -6,19 +6,22 @@ import torch.nn.functional as F
 import math
 import numpy as np
 import collections
-import matplotlib.pyplot as plt
+from torch.utils.tensorboard import SummaryWriter
+from torch.distributions.categorical import Categorical
+writer = SummaryWriter('board/cart-pole')
 
 env = gym.make('CartPole-v1')
 device = torch.device("cuda")
 
 num_of_observations = 4
-hidden_perceptrons = 16
+hidden_perceptrons = 100
 posibles_actions = 2
 
-lr = 0.001
-weight_decay = 0.000_5
-number_of_episodes = 1_000
-max_episode_length = 200
+gamma = 0.99
+lr = 0.000_1
+weight_decay = 0.000_05
+number_of_episodes = 500
+max_episode_length = 250
 success_score = 195
 
 layers = collections.OrderedDict([
@@ -26,19 +29,18 @@ layers = collections.OrderedDict([
     ("relu_i", nn.ReLU()),
     ("hidden_1", nn.Linear(hidden_perceptrons, hidden_perceptrons)),
     ("relu_h1", nn.ReLU()),
-    ("hidden_2", nn.Linear(hidden_perceptrons, posibles_actions)),
-    ("relu_h2", nn.ReLU()),
-    ("classification", nn.Linear(posibles_actions, posibles_actions)),
-    ("softmax", nn.Softmax()),
+    ("dropout", nn.Dropout(0.5)),
+    ("classification", nn.Linear(hidden_perceptrons, posibles_actions)),
+    ("softmax", nn.Softmax())
 ])
 policy = nn.Sequential(layers).to(device)
+
 
 """
     Description:
         A pole is attached by an un-actuated joint to a cart, which moves along
         a frictionless track. The pendulum starts upright, and the goal is to
-        prevent it from falling over by increasing and reducing the cart's
-        velocity.
+        prevent it from falling over by increasing and reducing the cart'shttps://meet.google.com/muk-hgdy-zvy?authuser=0
     Source:
         This environment corresponds to the version of the cart-pole problem
         described by Barto, Sutton, and Anderson
@@ -73,64 +75,74 @@ policy = nn.Sequential(layers).to(device)
 """
 
 optimizer = optim.Adam(policy.parameters(), lr=lr, weight_decay=weight_decay)
-criterion = nn.CrossEntropyLoss()
 number_of_consecutive_success = 0
+scores = []
 
-losses = []
-accs = []
-
+policy.train()
 for i_episode in range(number_of_episodes):
     observation = env.reset()
+    weight = []
+    batch_logprob = []
     score = 0
+
     for t in range(max_episode_length):
         # env.render()
 
+        # collect trajectory
         input = F.Tensor(observation).to(device)
 
-        policy.eval()
-        predictionTorch = policy(input)
-        _, pred = predictionTorch.max(0)
-        action = pred.item()
+        p = policy(input)
+        dist = Categorical(probs=p)
+        predictionTorch = dist.sample()
+        batch_logprob.append(dist.log_prob(predictionTorch))
+
+        action = predictionTorch.item()
+
         observation, reward, done, info = env.step(action)
-        score += reward
+        weight.append(reward)
 
-        # TODO rething the target function
-        if (reward == 1.0):
-            if (action == 0):
-                target = torch.LongTensor([1, 0])
-            else:
-                target = torch.LongTensor([0, 1])
-        else:
-            if (action == 0):
-                target = torch.LongTensor([0, 1])
-            else:
-                target = torch.LongTensor([1, 0])
-
-        policy.train()
-        optimizer.zero_grad()
-        # TODO REVIEW this loss
-        predictionTorch = predictionTorch.repeat(2).reshape(2, 2)
-        loss = criterion(predictionTorch, target.to(device))
-        loss.backward()
-        losses.append(loss.item())
-        optimizer.step()
-
+        score = sum(weight)
+        scores.append(score)
         if done:
-
-            print("Episode finished after {} timestepms. Loss: {:.6f}".format(
-                t+1, loss.item()))
             break
 
-    if score > success_score:
-        print("Challenge archived")
-        number_of_consecutive_success += 1
+    if i_episode % 50 == 0:
+        av = sum(scores)/len(scores)
+        writer.add_scalar('Score every 50 episodes ', av)
+        print("Episode: %i, score: %i, average: %f" % (
+            i_episode, score, av))
+        scores = []
     else:
-        number_of_consecutive_success = 0
+        scores.append(score)
+    writer.add_scalar('score', score)
+
+    logp = torch.tensor(batch_logprob)
+    logp.to(device)
+
+    G = 0
+    returns = []
+    for r in weight:
+        G = r + gamma * G
+        returns.append(G)
+    a_hat = torch.tensor(returns)
+    a_hat.to(device)
+
+    batch_loss = []
+    for log_prob, r in zip(batch_logprob, returns):
+        batch_loss.append(-log_prob * r)
+
+    loss = torch.stack(batch_loss).mean()
+
+    loss.backward()
+    optimizer.step()
+    optimizer.zero_grad()
+    scores.append(score)
+
     if (number_of_consecutive_success > 99):
         print("Episode %i: We have a model!!!" % (i_episode, ))
-        torch.save(policy.state_dict(), "./model/cart-pole.pth")
+        torch.save(policy.state_dict(), "../model/cart-pole.pth")
         break
-
-plt.plot(losses)
-plt.show()
+writer.close()
 env.close()
+
+torch.save(policy.state_dict(), "./model/cart-pole.pth")
