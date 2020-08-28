@@ -4,10 +4,10 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 import numpy as np
-import time
-
 from torch.utils.tensorboard import SummaryWriter
-from torch.distributions import Categorical
+from torch.distributions import Normal
+#from torch.distributions import MultivariateNormal
+
 
 
 # Hyper parameters
@@ -19,30 +19,13 @@ k_epochs = 4
 update_every_j_timestep = 50
 max_episode_length = 1_000
 max_steps = 500
-critic_hidden_size = 256
-actor_hidden_size = 16
+critic_hidden_size = 32
+actor_hidden_size = 32
 render = False
-# eps = np.finfo(np.float32).eps.item()  # machine epsilon
-eps = 1e-5
-coeficient_entropy = 0.01
-coeficient_value = 0.5
-lmbda = 0.95
 
 
 # Setup device
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-# inicializers
-
-
-def init_normal(m):
-    if type(m) == nn.Linear:
-        nn.init.uniform_(m.weight)
-
-
-def init_orthogonal(m):
-    if type(m) == nn.Linear:
-        nn.init.orthogonal_(m.weight)
 
 # Memory
 
@@ -67,27 +50,29 @@ class Memory:
 class Actor(nn.Module):
     def __init__(self, num_of_observations, posibles_actions, hidden_size=actor_hidden_size):
         super(Actor, self).__init__()
-        self.num_of_observations = num_of_observations
+
         self.actor = nn.Sequential(
             nn.Linear(num_of_observations, hidden_size),
             nn.Tanh(),
-            nn.Linear(hidden_size, hidden_size),
+            nn.Linear(hidden_size, hidden_size//2),
             nn.Tanh(),
-            nn.Linear(hidden_size, posibles_actions),
-            nn.Softmax(dim=-1)
+            nn.Linear(hidden_size // 2, posibles_actions),
+            nn.Tanh(),
         )
-        self.actor.apply(init_orthogonal)
 
     def forward(self, x):
         probs = self.actor(x)
         return probs
 
     def act(self, state, memory):
+
         state = torch.from_numpy(state).float().to(device)
 
-        probs = self.forward(state.flatten())
+        probs = self.forward(state)
+        
+        // Como calcular la sigma de las probs
 
-        dist = Categorical(probs)
+        dist = Normal(probs, covariance_matrix)
         action = dist.sample()
         logprobs = dist.log_prob(action)
 
@@ -95,7 +80,7 @@ class Actor(nn.Module):
         memory.actions.append(action)
         memory.logprobs.append(logprobs)
         return action.item()
-
+    
     def play(self, state):
         state = torch.from_numpy(state).float().to(device)
         probs = self.forward(state)
@@ -107,27 +92,25 @@ class Actor(nn.Module):
 class Critic(nn.Module):
     def __init__(self, num_of_observations, posibles_actions, hidden_size=critic_hidden_size):
         super(Critic, self).__init__()
-        self.num_of_observations = num_of_observations
         self.critic = nn.Sequential(
             nn.Linear(num_of_observations, hidden_size),
             nn.Tanh(),
-            nn.Linear(hidden_size, hidden_size),
+            nn.Linear(hidden_size, hidden_size//2),
             nn.Tanh(),
-            nn.Linear(hidden_size, 1),
+            nn.Linear(hidden_size//2, 1),
         )
-        self.critic.apply(init_orthogonal)
 
     def forward(self, x):
         probs = self.actor(x)
         return probs
 
     def evaluate(self, state, action, actor):
-        state = state.reshape((-1, self.num_of_observations))
         action_probs = actor(state)
         dist = Categorical(action_probs)
 
         action_logprobs = dist.log_prob(action)
         dist_entropy = dist.entropy()
+
         state_value = self.critic(state)
 
         return action_logprobs, torch.squeeze(state_value), dist_entropy
@@ -145,10 +128,6 @@ class PPO:
                  gamma=gamma,
                  k_epochs=k_epochs,
                  clip_ratio=clip_ratio,
-                 previousTrainedPolicy=None,
-                 previousTrainedCritic=None,
-                 actorGradientNormalization=0,
-                 observationNormalization=False
                  ):
         # Current
         self.actor = Actor(num_of_observations=num_of_observations,
@@ -156,38 +135,28 @@ class PPO:
         self.critic = Critic(num_of_observations=num_of_observations,
                              posibles_actions=posibles_actions, hidden_size=critic_hidden_size).to(device)
 
-        if previousTrainedPolicy:
-            self.actor.load_state_dict(previousTrainedPolicy)
-        if previousTrainedCritic:
-            self.critic.load_state_dict(previousTrainedCritic)
-
         # Old
         self.actor_old = Actor(num_of_observations=num_of_observations,
                                posibles_actions=posibles_actions, hidden_size=actor_hidden_size).to(device)
         self.critic_old = Critic(num_of_observations=num_of_observations,
                                  posibles_actions=posibles_actions, hidden_size=critic_hidden_size).to(device)
-
         self.actor_old.load_state_dict(self.actor.state_dict())
         self.critic_old.load_state_dict(self.critic.state_dict())
 
         # Optimizers
-        self.actor_optimizer = optim.Adam(
-            self.actor.parameters(), lr=pi_lr, weight_decay=2.5e-4,  eps=eps, betas=(0.99, 0.999))
-        self.actor_critic = optim.Adam(
-            self.critic.parameters(), lr=vf_lr, weight_decay=2.5e-4, eps=eps, betas=(0.99, 0.999))
+        self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=pi_lr)
+        self.actor_critic = optim.Adam(self.critic.parameters(), lr=vf_lr)
 
         # Save parameters
         self.gamma = gamma
         self.k_epochs = k_epochs
         self.clip_ratio = clip_ratio
         self.environment_name = environment_name
-        self.actorGradientNormalization = actorGradientNormalization
-        self.observationNormalization = observationNormalization
-
         # Loss
-        self.mseLoss = nn.MSELoss()
+        self.MseLoss = nn.MSELoss()
 
-    def update(self, memory, writer):
+    def update(self, memory):
+        rewards = self.compute_returns(self.gamma, memory)
 
         # convert list to tensor
         old_states = torch.stack(memory.states).to(device).detach()
@@ -196,38 +165,25 @@ class PPO:
 
         for e in range(self.k_epochs):
             # Evaluating old actions and values :
-            logprobs, values, dist_entropy = self.critic.evaluate(
+            logprobs, state_values, dist_entropy = self.critic.evaluate(
                 old_states, old_actions, self.actor)
-
-            # GAE Compute rewards
-            rewards, advantages = self.gae(self.gamma, memory, values)
-
-            # Default compute rewards
-            #rewards, advantages = self.compute_returns(self.gamma, memory)
 
             # Finding the ratio (pi_theta / pi_theta__old):
             ratios = torch.exp(logprobs - old_logprobs)
+            
 
+            # Finding Surrogate Loss:
+            advantages = rewards - state_values.detach()
             surr1 = ratios * advantages
             surr2 = torch.clamp(ratios, 1 - self.clip_ratio,
-                                1 + self.clip_ratio) * advantages
-            policy_loss = -torch.min(surr1, surr2)
-            value_loss = coeficient_value * self.mseLoss(values, rewards)
-            # entropy del critic or actor?
-            entropy = coeficient_entropy * dist_entropy
-            loss = policy_loss + value_loss - entropy
+                                1+self.clip_ratio) * advantages
+            loss = -torch.min(surr1, surr2) + 0.5 * \
+                self.MseLoss(state_values, rewards) - 0.01 * dist_entropy
 
-            writer.add_scalar("policy_loss", policy_loss.mean())
-            writer.add_scalar("value_loss", value_loss.mean())
-            writer.add_scalar("entropy", entropy.mean())
-            writer.add_scalar("loss", loss.mean())
-
+            # take gradient step
             self.actor_optimizer.zero_grad()
             self.actor_critic.zero_grad()
             loss.mean().backward()
-            if (self.actorGradientNormalization != 0):
-                torch.nn.utils.clip_grad_norm_(
-                    self.actor.parameters(), self.actorGradientNormalization)
             self.actor_optimizer.step()
             self.actor_critic.step()
 
@@ -240,48 +196,17 @@ class PPO:
 
     def compute_returns(self, gamma, memory):
         R = 0
-
         returns = []
         for reward, is_terminal in zip(reversed(memory.rewards), reversed(memory.is_terminals)):
             if is_terminal:
                 R = 0
-            R = reward + gamma * R * lmbda
+            R = reward + gamma * R
             returns.insert(0, R)
 
         # Normalizing the returns:
         returns = torch.tensor(returns, dtype=torch.float32).to(device)
-        v_target = returns.clone()
-        returns = (returns - returns.mean()) / (returns.std() + eps)
-        return returns, v_target
-
-    def gae(self, gamma, memory, v):
-        gae = 0
-        returns = []
-        adv = []
-        values = (v.data).cpu().numpy()
-        for reward, is_terminal, value in zip(reversed(memory.rewards), reversed(memory.is_terminals), reversed(values)):
-            mask = not is_terminal
-            delta = reward + gamma * value * mask - value
-            gae = delta + gamma * lmbda * mask * gae
-            returns.insert(0, gae + value)
-            adv.insert(0, gae)
-
-        adv = (adv - np.mean(adv)) / (np.std(adv) + eps)
-        returns = torch.tensor(returns, dtype=torch.float32).to(device)
-        adv = torch.tensor(adv, dtype=torch.float32).to(device)
-        return returns, adv
-
-
-def prodOfTupple(val):
-    val = list(val)
-    res = 1
-    for ele in val:
-        res *= ele
-    return res
-
-
-def normalizeArray(data):
-    return (data - np.min(data)) / (np.max(data) - np.min(data))
+        returns = (returns - returns.mean()) / (returns.std() + 1e-5)
+        return returns
 
 
 def train(environment_name,
@@ -294,35 +219,24 @@ def train(environment_name,
           update_every_j_timestep=50,
           max_episode_length=1_000,
           max_steps=500,
-          critic_hidden_size=256,
-          actor_hidden_size=16,
+          critic_hidden_size=32,
+          actor_hidden_size=32,
           render=False,
           random_seed=None,
-          posibles_actions=None,
-          pathForBasePolicyToTrain=None,
-          pathForBaseCriticToTrain=None,
-          observationNormalization=False,
-          actorGradientNormalization=0):
+          posibles_actions=None):
 
-    previousTrainedPolicy = None
-    if pathForBasePolicyToTrain:
-        previousTrainedPolicy = torch.load(pathForBasePolicyToTrain)
-
-    previousTrainedCritic = None
-    if pathForBaseCriticToTrain:
-        previousTrainedCritic = torch.load(pathForBaseCriticToTrain)
 
     # logging variables
     running_reward = 0
     avg_length = 0
     log_interval = 10
 
+
     # Environment
     env = gym.make(environment_name)
-
-    num_of_observations = prodOfTupple(env.observation_space.shape)
+    num_of_observations = env.observation_space.shape[0]
     if (posibles_actions == None):
-        posibles_actions = env.action_space.n
+        posibles_actions = env.action_space.shape[0]
 
     # Setup tensorboard
     writer = SummaryWriter('board/ppo')
@@ -345,21 +259,12 @@ def train(environment_name,
               vf_lr=vf_lr,
               gamma=gamma,
               k_epochs=k_epochs,
-              clip_ratio=clip_ratio,
-              previousTrainedPolicy=previousTrainedPolicy,
-              previousTrainedCritic=previousTrainedCritic,
-              observationNormalization=observationNormalization,
-              actorGradientNormalization=actorGradientNormalization)
+              clip_ratio=clip_ratio)  # use hyperparametres
 
-    startTime = time.time()
     for i_episode in range(1, max_episode_length+1):
         state = env.reset()
         for t in range(1, max_steps + 1):
-            timestep += 1
-            # normalize state
-            # https://arxiv.org/pdf/2006.05990.pdf
-            if (observationNormalization):
-                state = normalizeArray(state)
+            timestep +=1
             # Running policy_old:
             action = ppo.actor_old.act(state, memory)
             state, reward, done, _ = env.step(action)
@@ -370,7 +275,7 @@ def train(environment_name,
 
             # update if its time
             if timestep % update_every_j_timestep == 0:
-                ppo.update(memory, writer)
+                ppo.update(memory)
 
             running_reward += reward
             if render:
@@ -385,59 +290,44 @@ def train(environment_name,
         writer.add_scalar('avg_length', int(avg_length/log_interval))
 
         if i_episode % log_interval == 0:
-            elapsedTime = time.time() - startTime
-            print('Episode {} \t avg length: {} \t avg reward: {} \t lapse time (ms): {}'.format(
-                i_episode, int(avg_length/log_interval), int((running_reward/log_interval)), elapsedTime * 1000))
+            print('Episode {} \t avg length: {} \t reward: {}'.format(
+                i_episode, int(avg_length/log_interval), int((running_reward/log_interval))))
             running_reward = 0
             avg_length = 0
-            startTime = time.time()
-
-        x = int((running_reward/log_interval))
+    
+        x = int((running_reward/log_interval))            
         if solved_reward < x:
             print("-----> goal archived, stop the training")
             break
-        if i_episode % 10_000 == 0:
-            numK = i_episode / 1_000
-            torch.save(ppo.actor_old.state_dict(),
-                       './model/ppo_{}_policy_{}K.pth'.format(environment_name, numK))
-            torch.save(ppo.critic_old.state_dict(),
-                       './model/ppo_{}_critic_{}K.pth'.format(environment_name, numK))
+
+    
     print("End training")
-    torch.save(ppo.actor_old.state_dict(),
-               './model/ppo_{}_policy_latest.pth'.format(environment_name))
-    torch.save(ppo.critic_old.state_dict(),
-               './model/ppo_{}_critic_latest.pth'.format(environment_name))
-    env.close()
+    torch.save(ppo.actor_old.state_dict(), './model/ppo_{}_latest.pth'.format(environment_name))
     return ppo
-
-
+    
 def play_latest(environment_name, size):
+       
 
     env = gym.make(environment_name)
-    num_of_observations = prodOfTupple(env.observation_space.shape)
-
+    num_of_observations = env.observation_space.shape[0]
     posibles_actions = env.action_space.n
     state = env.reset()
-
-    actor = Actor(num_of_observations, posibles_actions,
-                  hidden_size=size).to(device)
-    actor.load_state_dict(torch.load(
-        './model/ppo_{}_policy_latest.pth'.format(environment_name)))
-
+    
+    actor = Actor(num_of_observations, posibles_actions, hidden_size=size).to(device)
+    actor.load_state_dict(torch.load('./model/ppo_{}_latest.pth'.format(environment_name)))
+    
     done = False
-    total_reward = 0
+    total_reward = 0    
     torch.backends.cudnn.deterministic = False
     torch.backends.cudnn.benchmark = True
-    i = 0
+    
     while (not done):
-        state = np.ndarray.flatten(state)
         action = actor.play(state)
-        print("---->", i, "---->", action)
-        i = i + 1
-
         state, reward, done, _ = env.step(action)
         env.render()
         total_reward += reward
-
+    
     env.close()
     print("total reward {}".format(total_reward))
+    
+        
