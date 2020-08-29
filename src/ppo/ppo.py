@@ -5,8 +5,9 @@ import torch.optim as optim
 import torch.nn.functional as F
 import numpy as np
 import time
-from datetime import datetime
+import matplotlib.pyplot as plt
 
+from datetime import datetime
 from torch.utils.tensorboard import SummaryWriter
 from torch.distributions import Categorical
 
@@ -101,7 +102,7 @@ class Actor(nn.Module):
         state = torch.from_numpy(state).float().to(device)
         probs = self.forward(state)
         _, action = probs.max(0)
-        return action.item()
+        return action.item(), probs.data
 
 
 # Critic
@@ -399,12 +400,14 @@ def train(environment_name,
               advantageAlgorithm=advantageAlgorithm,
               )
 
+    globlalStep = 0
     startTime = time.time()
     for i_episode in range(1, max_episode_length+1):
         state = env.reset()
         episode_reward = 0
         for t in range(1, max_steps + 1):
             timestep += 1
+            globlalStep += 1
             # normalize state
             # https://arxiv.org/pdf/2006.05990.pdf
             if (observationNormalization):
@@ -435,6 +438,7 @@ def train(environment_name,
         avg_length += t
 
         writer.add_scalar('episode_reward', int(episode_reward))
+        writer.add_scalar('global_step', int(globlalStep))
 
         writer.add_scalar('running_reward', int(
             (running_reward / log_interval)))
@@ -442,8 +446,8 @@ def train(environment_name,
 
         if i_episode % log_interval == 0:
             elapsedTime = time.time() - startTime
-            print('Episode {} \t avg length: {} \t avg reward: {} \t lapse time (ms): {}'.format(
-                i_episode, int(avg_length/log_interval), int((running_reward/log_interval)), elapsedTime * 1000))
+            print('Episode {} \t avg length: {} \t avg reward: {} \t globalStep: {} \t lapse time (ms): {}'.format(
+                i_episode, int(avg_length/log_interval), int((running_reward/log_interval)), globlalStep, elapsedTime * 1000))
             running_reward = 0
             avg_length = 0
             startTime = time.time()
@@ -468,7 +472,7 @@ def train(environment_name,
     return ppo
 
 
-def play_latest(environment_name, size):
+def play_latest(environment_name, size, plot=False):
 
     env = gym.make(environment_name)
     num_of_observations = prodOfTupple(env.observation_space.shape)
@@ -486,15 +490,32 @@ def play_latest(environment_name, size):
     torch.backends.cudnn.deterministic = False
     torch.backends.cudnn.benchmark = True
     i = 0
+
+    if plot:
+        y_pos = np.arange(posibles_actions)
+        probLegend = [0, 0.2, 0.4, 0.6, 0.8, 1]
+        plt.xticks(y_pos, y_pos)
+        plt.ylabel('Probs')
+        plt.xlabel('Action')
+
     while (not done):
         state = np.ndarray.flatten(state)
-        action = actor.play(state)
-        print("---->", i, "---->", action)
+        action, probs = actor.play(state)
         i = i + 1
-
+        if plot:
+            probs = probs.detach().cpu().numpy()
+            ax = plt.bar(y_pos, probs, align='center',
+                         alpha=0.5, color=(0.2, 0.4, 0.6, 0.6))
+            plt.title(f'Step - {i}, Action choosed: {action}')
+            plt.pause(0.02)
+            ax.remove()
+        print(f'step {i} \t action {action}')
         state, reward, done, _ = env.step(action)
         env.render()
         total_reward += reward
 
-    env.close()
     print("total reward {}".format(total_reward))
+    if plot:
+        plt.show()
+        plt.close()
+    env.close()
