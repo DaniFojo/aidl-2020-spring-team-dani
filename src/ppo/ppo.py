@@ -43,6 +43,15 @@ def init_orthogonal(m):
         nn.init.orthogonal_(m.weight)
         if m.bias is not None:
             m.bias.data.fill_(0)
+
+
+def layer_init(layer, scale=1.0):
+    nn.init.orthogonal_(layer.weight.data)
+    layer.weight.data.mul_(scale)
+    nn.init.constant_(layer.bias.data, 0)
+    return layer
+
+
 # Memory
 
 
@@ -67,18 +76,25 @@ class Actor(nn.Module):
     def __init__(self, num_of_observations, posibles_actions, hidden_size=actor_hidden_size, initialization=None):
         super(Actor, self).__init__()
         self.num_of_observations = num_of_observations
+        self.fc1 = nn.Linear(num_of_observations, hidden_size)
+        self.fc2 = nn.Linear(hidden_size, hidden_size)
+        self.fc3 = nn.Linear(hidden_size, posibles_actions)
         self.actor = nn.Sequential(
-            nn.Linear(num_of_observations, hidden_size),
+            self.fc1,
             nn.Tanh(),
-            nn.Linear(hidden_size, hidden_size),
+            self.fc2,
             nn.Tanh(),
-            nn.Linear(hidden_size, posibles_actions),
+            self.fc3,
             nn.Softmax(dim=-1)
         )
         if initialization == "normal":
             self.actor.apply(init_normal)
+
         if initialization == "orthogonal":
-            self.actor.apply(init_orthogonal)
+            # self.actor.apply(init_orthogonal)
+            layer_init(self.fc1)
+            layer_init(self.fc2)
+            layer_init(self.fc3, 1e-3)
 
     def forward(self, x):
         probs = self.actor(x)
@@ -110,18 +126,24 @@ class Critic(nn.Module):
     def __init__(self, num_of_observations, posibles_actions, hidden_size=critic_hidden_size, initialization=None):
         super(Critic, self).__init__()
         self.num_of_observations = num_of_observations
+        self.fc1 = nn.Linear(num_of_observations, hidden_size)
+        self.fc2 = nn.Linear(hidden_size, hidden_size)
+        self.fc3 = nn.Linear(hidden_size, 1)
         self.critic = nn.Sequential(
-            nn.Linear(num_of_observations, hidden_size),
+            self.fc1,
             nn.Tanh(),
-            nn.Linear(hidden_size, hidden_size),
+            self.fc2,
             nn.Tanh(),
-            nn.Linear(hidden_size, 1),
+            self.fc3,
         )
 
         if initialization == "normal":
             self.critic.apply(init_normal)
         if initialization == "orthogonal":
-            self.critic.apply(init_orthogonal)
+            # self.critic.apply(init_orthogonal)
+            layer_init(self.fc1)
+            layer_init(self.fc2)
+            layer_init(self.fc3, 1e-3)
 
     def forward(self, x):
         probs = self.actor(x)
@@ -161,7 +183,8 @@ class PPO:
                  actorGradientNormalization=0,
                  observationNormalization=False,
                  initialization=None,
-                 advantageAlgorithm=None
+                 advantageAlgorithm=None,
+                 normalizeAdvantage=False,
                  ):
         # Current
         self.actor = Actor(num_of_observations=num_of_observations,
@@ -202,11 +225,12 @@ class PPO:
         self.coeficient_value = coeficient_value
         self.lmbda = lmbda
         self.advantageAlgorithm = advantageAlgorithm
+        self.normalizeAdvantage = normalizeAdvantage
 
         # Loss
-        self.mseLoss = nn.L1Loss()
+        self.mseLoss = nn.MSELoss()
 
-    def update(self, memory, writer):
+    def update(self, memory, writer, num_mini_batch):
 
         # convert list to tensor
         old_states = torch.stack(memory.states).to(device).detach()
@@ -220,7 +244,8 @@ class PPO:
 
             # GAE Compute rewards
             if self.advantageAlgorithm == "GAE":
-                rewards, advantages = self.gae(self.gamma, memory, values)
+                rewards, advantages = self.gae(
+                    self.gamma, memory, values, normalizeAdvantage=self.normalizeAdvantage)
             else:
                 rewards, advantages = self.compute_returns(self.gamma, memory)
 
@@ -230,17 +255,17 @@ class PPO:
             surr1 = ratios * advantages
             surr2 = torch.clamp(ratios, 1 - self.clip_ratio,
                                 1 + self.clip_ratio) * advantages
-            policy_loss = -torch.min(surr1, surr2)
+            policy_loss = torch.min(surr1, surr2)
             value_loss = self.coeficient_value * \
-                self.mseLoss(values, rewards)
+                F.smooth_l1_loss(values, rewards)
             # entropy del critic or actor?
             entropy = self.coeficient_entropy * dist_entropy
-            loss = policy_loss + value_loss - entropy
+            loss = -policy_loss + value_loss - entropy
 
-            writer.add_scalar("policy_loss", policy_loss.mean())
-            writer.add_scalar("value_loss", value_loss.mean())
-            writer.add_scalar("entropy", dist_entropy.mean())
-            writer.add_scalar("loss", loss.mean())
+            writer.add_scalar("1 - loss/policy", policy_loss.mean())
+            writer.add_scalar("1 - loss/value", value_loss.mean())
+            writer.add_scalar("1 - loss/entropy", dist_entropy.mean())
+            writer.add_scalar("1 - loss/loss", loss.mean())
 
             self.actor_optimizer.zero_grad()
             self.critic_optimizer.zero_grad()
@@ -274,7 +299,7 @@ class PPO:
         returns = (returns - returns.mean()) / (returns.std() + eps)
         return returns, v_target
 
-    def gae(self, gamma, memory, v):
+    def gae(self, gamma, memory, v, normalizeAdvantage=False):
         gae = 0
         returns = []
         adv = []
@@ -286,7 +311,8 @@ class PPO:
             returns.insert(0, gae + value)
             adv.insert(0, gae)
 
-        adv = (adv - np.mean(adv)) / (np.std(adv) + self.eps)
+        if normalizeAdvantage:
+            adv = (adv - np.mean(adv)) / (np.std(adv) + self.eps)
         returns = torch.tensor(returns, dtype=torch.float32).to(device)
         adv = torch.tensor(adv, dtype=torch.float32).to(device)
         return returns, adv
@@ -336,7 +362,9 @@ def train(environment_name,
           initialization="orthogonal",
           advantageAlgorithm="GAE",
           saveModelsEvery=10_000,
-          tensorboardName=None
+          tensorboardName=None,
+          normalizeAdvantage=False,
+          num_mini_batch=32
           ):
 
     previousTrainedPolicy = None
@@ -398,6 +426,7 @@ def train(environment_name,
               coeficient_value=coeficient_value,
               initialization=initialization,
               advantageAlgorithm=advantageAlgorithm,
+              normalizeAdvantage=normalizeAdvantage
               )
 
     globlalStep = 0
@@ -422,13 +451,15 @@ def train(environment_name,
 
             # update if its time
             if timestep % update_every_j_timestep == 0:
-                ppo.update(memory, writer)
+                ppo.update(memory, writer, num_mini_batch)
 
             running_reward += reward
             episode_reward += reward
 
-            writer.add_scalar('lr actor', get_lr(ppo.actor_optimizer))
-            writer.add_scalar('lr critic', get_lr(ppo.critic_optimizer))
+            writer.add_scalar('2 - lerning rate/actor',
+                              get_lr(ppo.actor_optimizer))
+            writer.add_scalar('2 - lerning rate/critic',
+                              get_lr(ppo.critic_optimizer))
 
             if render:
                 env.render()
@@ -436,18 +467,17 @@ def train(environment_name,
                 break
 
         avg_length += t
-
-        writer.add_scalar('episode_reward', int(episode_reward))
-        writer.add_scalar('global_step', int(globlalStep))
-
-        writer.add_scalar('running_reward', int(
-            (running_reward / log_interval)))
-        writer.add_scalar('avg_length', int(avg_length/log_interval))
+        writer.add_scalar('0 - reward/episode', int(episode_reward))
+        writer.add_scalar('0 - reward/steps', int(globlalStep))
 
         if i_episode % log_interval == 0:
             elapsedTime = time.time() - startTime
-            print('Episode {} \t avg length: {} \t avg reward: {} \t globalStep: {} \t lapse time (ms): {}'.format(
-                i_episode, int(avg_length/log_interval), int((running_reward/log_interval)), globlalStep, elapsedTime * 1000))
+            print('Episode {} \t avg length: {} \t avg reward: {} \t\t globalStep: {} \t elapse time (ms): {}'.format(
+                i_episode, int(avg_length / log_interval), int((running_reward / log_interval)), globlalStep, elapsedTime * 1000))
+            writer.add_scalar('0 - reward/running reward', int(
+                (running_reward / log_interval)))
+            writer.add_scalar('0 - reward/running length',
+                              int(avg_length/log_interval))
             running_reward = 0
             avg_length = 0
             startTime = time.time()
@@ -499,6 +529,7 @@ def play_latest(environment_name, size, plot=False):
         plt.xlabel('Action')
 
     while (not done):
+        env.render()
         state = np.ndarray.flatten(state)
         action, probs = actor.play(state)
         i = i + 1
@@ -511,7 +542,7 @@ def play_latest(environment_name, size, plot=False):
             ax.remove()
         print(f'step {i} \t action {action}')
         state, reward, done, _ = env.step(action)
-        env.render()
+
         total_reward += reward
 
     print("total reward {}".format(total_reward))

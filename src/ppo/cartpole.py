@@ -1,6 +1,7 @@
 import ppo
 if __name__ == "__main__":
     train = True
+
     if train:
         env = ppo.train(environment_name="CartPole-v0",
                         solved_reward=199,
@@ -11,8 +12,8 @@ if __name__ == "__main__":
                         k_epochs=4,
                         update_every_j_timestep=100,
                         max_episode_length=500,
-                        max_steps=300,
-                        critic_hidden_size=256,
+                        max_steps=210,
+                        critic_hidden_size=200,
                         actor_hidden_size=16,
                         render=False,
                         random_seed=1,
@@ -20,4 +21,4 @@ if __name__ == "__main__":
                         actorGradientNormalization=5,
                         )
 
-    ppo.play_latest("CartPole-v0", 16)
+    ppo.play_latest("CartPole-v0", 16, plot=True)
