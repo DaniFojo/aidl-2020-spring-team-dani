@@ -3,33 +3,77 @@ if __name__ == "__main__":
     train = True
     actor_size = 64
     critic_size = 256
+    name = "Breakout-ram-v4"
+    observationNormalization = True
     if train:
-        env = ppo.train(environment_name="Breakout-ram-v4",
-                        gamma=0.99,
-                        clip_ratio=0.25,
-                        pi_lr=0.000_3,
-                        vf_lr=0.000_3,
-                        k_epochs=4,
-                        update_every_j_timestep=4,
-                        max_episode_length=1000,
-                        max_steps=128,
-                        critic_hidden_size=critic_size,
-                        actor_hidden_size=actor_size,
-                        render=False,
-                        random_seed=1,
-                        solved_reward=300,
-                        observationNormalization=True,  # Normalize observations of the environment
-                        # Clips gradient norm of an iterable of parameters. max norm of the gradients
-                        actorGradientNormalization=5,
-                        # pathForBasePolicyToTrain="./model/ppo_Breakout-ram-v0_policy_latest.pth",
-                        # pathForBaseCriticToTrain="./model/ppo_Breakout-ram-v0_critic_latest.pth",
-                        eps=1e-5,
-                        coeficient_entropy=0.1,
-                        coeficient_value=0.5,
-                        lmbda=0.95,
-                        initialization="orthogonal",  # normal = normal distribution, None
-                        advantageAlgorithm="GAE",  # None = use A2C reward calculation
-                        weight_decay=0.000_05,
-                        saveModelsEvery=10_000)
+        env = ppo.multitrain(name,
+                             gammas=[0.99],
+                             clip_ratios=[0.1],
+                             lrs=[1e-3],
+                             # vf_lr=[2e-3],
+                             # k_epochs=4,
+                             update_every_j_timesteps=[1000],
+                             # 128 * 80_000 ~ 10 Millions 120K ~ 15M
+                             max_episode_lengths=[5_000],
+                             max_steps=[500],
+                             critic_sizes=[256],
+                             actor_sizes=[32, 128],
+                             # render=False,
+                             # random_seed=1,
+                             solved_reward=249,
+                             # Normalize observations of the environment
+                             observationNormalizations=[True],
+                             # Clips gradient norm of an iterable of parameters. max norm of the gradients
+                             actorGradientNormalizations=[0, 5],
+                             normalizeAdvantages=[False],
+                             # initialization="orthogonal",  # normal = normal distribution, None
+                             # advantageAlgorithm="GAE",  # None = use A2C reward calculation
+                             # pathForBasePolicyToTrain=f"./model/ppo_{name}_policy_latest.pth",
+                             # pathForBaseCriticToTrain=f"./model/ppo_{name}_critic_latest.pth",
+                             coeficient_entropys=[0.01],  # 0.001
+                             coeficient_values=[0.5],  # 0.5
+                             lmbdas=[0.99],
+                             epss=[1e-5],
+                             # weight_decay=5e-4,
+                             # saveModelsEvery=5_000,
+                             betass=[(0.9, 0.999)],
+                             dropouts=[0, 0.5],
+                             )
 
-    ppo.play_latest("Breakout-ram-v4", actor_size)
+# Train only one model
+
+    #     env = ppo.train(environment_name=name,
+    #                     gamma=0.99,
+    #                     clip_ratio=0.2,
+    #                     pi_lr=2e-3,
+    #                     vf_lr=2e-3,
+    #                     k_epochs=4,
+    #                     update_every_j_timestep=600,
+    #                     max_episode_length=15_000,  # 128 * 80_000 ~ 10 Millions 120K ~ 15M
+    #                     max_steps=300,
+    #                     critic_hidden_size=critic_size,
+    #                     actor_hidden_size=actor_size,
+    #                     render=False,
+    #                     random_seed=1,
+    #                     solved_reward=249,
+    #                     # Normalize observations of the environment
+    #                     observationNormalization=observationNormalization,
+    #                     # Clips gradient norm of an iterable of parameters. max norm of the gradients
+    #                     actorGradientNormalization=0,
+    #                     normalizeAdvantage=False,
+    #                     initialization="orthogonal",  # normal = normal distribution, None
+    #                     advantageAlgorithm="GAE",  # None = use A2C reward calculation
+    #                     # pathForBasePolicyToTrain=f"./model/ppo_{name}_policy_latest.pth",
+    #                     # pathForBaseCriticToTrain=f"./model/ppo_{name}_critic_latest.pth",
+    #                     coeficient_entropy=0.01,  # 0.001
+    #                     coeficient_value=0.5,  # 0.5
+    #                     lmbda=0.996,
+    #                     eps=1e-5,
+    #                     weight_decay=5e-4,
+    #                     saveModelsEvery=5_000,
+    #                     # betas=(0.9, 0.999),
+    #                     dropout=0.5,
+    #                     tensorboardName="Base-32,DO=0.5,ON=True,AN=0,Upd=600,LR=2e-3,\=.996,WD=5e-4,CP=.2,15K",)
+
+    # ppo.play_latest(name, actor_size, plot=False,
+    #                 observationNormalization=observationNormalization)
