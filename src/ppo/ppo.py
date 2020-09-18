@@ -131,8 +131,8 @@ class Critic(nn.Module):
         super(Critic, self).__init__()
         self.num_of_observations = num_of_observations
         self.fc1 = nn.Linear(num_of_observations, hidden_size)
-        self.fc2 = nn.Linear(hidden_size, hidden_size)
-        self.fc3 = nn.Linear(hidden_size, 1)
+        self.fc2 = nn.Linear(hidden_size, hidden_size//2)
+        self.fc3 = nn.Linear(hidden_size//2, 1)
         if dropout == None:
             dropout = 0
         self.critic = nn.Sequential(
@@ -659,7 +659,7 @@ def play_latest(environment_name, size, plot=False, observationNormalization=Fal
     actor = Actor(num_of_observations, posibles_actions, 0,
                   hidden_size=size).to(device)
     actor.load_state_dict(torch.load(
-        './model/ppo_{}_policy_latest.pth'.format(environment_name)))
+        './model/ppo_SpaceInvaders-v4_policy_22K.pth'.format(environment_name)))
 
     done = False
     total_reward = 0
