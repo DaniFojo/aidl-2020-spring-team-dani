@@ -84,14 +84,17 @@ class Game:
         return self.obs_4
 
     def play(self, action):
-        self.env.render()
-        obs, r, done, info = self.env.step(action)
+        reward = 0.
+        for i in range(4):
+            self.env.render()
+            obs, r, done, info = self.env.step(action)
+            reward += r
+
         obs = self._process_obs(obs)
         self.obs_4 = np.roll(self.obs_4, shift=-1, axis=0)
         self.obs_4[-1] = obs
 
-        obsT = obs_to_torch(self.obs_4).reshape(-1, 4, 84, 84).to(device)
-        return obsT, r, done
+        return self.obs_4, r, done
 
     @staticmethod
     def _process_obs(obs):
@@ -138,14 +141,14 @@ class Model(nn.Module):
         # 9x9 frame and produces a 7x7 frame
         self.conv3 = nn.Conv2d(
             in_channels=64, out_channels=64, kernel_size=3, stride=1)
-        # 512 features
-        self.lin = nn.Linear(in_features=7 * 7 * 64, out_features=512)
+        # 128 features
+        self.lin = nn.Linear(in_features=7 * 7 * 64, out_features=128)
 
         # A fully connected layer to get logits for $\pi$
-        self.pi_logits = nn.Linear(in_features=512, out_features=4)
+        self.pi_logits = nn.Linear(in_features=128, out_features=4)
 
         # A fully connected layer to get value function
-        self.value = nn.Linear(in_features=512, out_features=1)
+        self.value = nn.Linear(in_features=128, out_features=1)
 
     def forward(self, obs: torch.Tensor):
         h = F.relu(self.conv1(obs))
@@ -191,7 +194,10 @@ class Main:
                  coeficient_vf,
                  actorGradientNormalizations,
                  game,
-                 log_interval,
+                 log_interval=10,
+                 save_interval=1_000,
+                 solved_reward=None,
+                 base_model_path=None,
                  ):
 
         self.game = game
@@ -207,6 +213,8 @@ class Main:
         self.coeficient_vf = coeficient_vf
         self.actorGradientNormalizations = actorGradientNormalizations
         self.log_interval = log_interval
+        self.save_interval = save_interval
+        self.solved_reward = solved_reward
         self.batch_size = self.n_workers * self.worker_steps
         self.mini_batch_size = self.batch_size // self.n_mini_batch
         assert (self.batch_size % self.n_mini_batch == 0)
@@ -223,6 +231,10 @@ class Main:
             self.obs[i] = worker.child.recv()
 
         self.model = Model().to(device)
+        if base_model_path:
+            previousModel = torch.load(base_model_path)
+            self.model.load_state_dict(previousModel)
+
         self.optimizer = optim.Adam(self.model.parameters(), lr=lr)
 
     def sample(self) -> (Dict[str, np.ndarray], List):
@@ -269,7 +281,8 @@ class Main:
             'actions': actions,
             'values': values,
             'log_pis': log_pis,
-            'advantages': advantages
+            'advantages': advantages,
+            'rewards': rewards,
         }
 
         #  flatten
@@ -395,7 +408,7 @@ class Main:
 
             self.train(samples, learning_rate, clip_range)
 
-            if (update + 1) % 1_000 == 0:
+            if (update + 1) % self.save_interval == 0:
                 d = datetime.now().strftime("%Y%m%d%H%M")
                 torch.save(self.model.state_dict(),
                            './model/ppo_{}_{}K_{}.pth'.format(self.game, ((update + 1) // 1_000), d))
@@ -404,9 +417,11 @@ class Main:
                 t = getString(elapsedTime)
                 globalElapsedTime = time.time() - globalStartTime
                 gt = getString(globalElapsedTime)
-                print('Episode {}  \t elapse time: {} \t global time: {}'.format(
-                    self.i_episode, t, gt))
+                print('Episode {}  \t elapse time: {} \t global time: {} \t avg reward {}'.format(
+                    self.i_episode, t, gt, samples['rewards'].mean()))
                 startTime = time.time()
+            if self.solved_reward != None and samples['rewards'].mean() > self.solved_reward:
+                break
 
         torch.save(self.model.state_dict(),
                    './model/ppo_{}_final.pth'.format(self.game))
@@ -426,7 +441,8 @@ def play(game, model_file, plot=False):
     model = Model().to(device)
     model.load_state_dict(torch.load(
         f"./model/{model_file}"))
-    obs = obs_to_torch(game.reset()).reshape(-1, 4, 84, 84).to(device)
+    x = obs_to_torch(game.reset())
+    obs = game.reset()
     done = False
     i = 0
     total_reward = 0
@@ -439,7 +455,8 @@ def play(game, model_file, plot=False):
         plt.xlabel('Action')
 
     while (not done):
-        action, probs = model.play(obs)
+        action, probs = model.play(obs_to_torch(
+            obs).reshape(-1, 4, 84, 84).to(device))
         obs, reward, done = game.play(action)
         i = i + 1
         if plot:
@@ -457,4 +474,3 @@ def play(game, model_file, plot=False):
     if plot:
         plt.show()
         plt.close()
-    env.close()
