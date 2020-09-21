@@ -1,5 +1,3 @@
-# aidl-2020-spring-team-dani
-
 # Our journey through Reinforcement Learning: From Vanilla Policy Gradients to PPO.
 
 ### UPC School
@@ -13,6 +11,7 @@
   - Hypothesis
   - Experiment Setup
   - Results
+  - Execution Instructions
   - Next Steps
   - Conclusions
 
@@ -53,8 +52,26 @@ where A is the advantage function for the current policy, π is the policy, 'a' 
 
 
 ### Advantage Actor Critic (A2C)
+The idea of Actor Critic is to use two neural networks. The actor is is a policy function that controls how our agent acts. The critic is a value function that measures how good these actions are.
+
+Both Actor and Critic run in parallel. As we have two models that need to be trained, we have two set of weights:
+<p align="center">
+  <img src="https://cdn-media-1.freecodecamp.org/images/1*KlX2-kNXRYLAYpdnI8VPiA.png">
+</p>
+
+In Advantage Actor Critic (A2C) we introduce an advantage function, which will tell us the improvement compared to the average the action taken at that state is. In other words, this function calculates the extra reward the agent gets if I take this action. The extra reward is that beyond the expected value of that state. The Advantage functions is as follows **Aπ(s,a)=Qπ(s,a)−Vπ(s)**.
+
+Recall the new update equation, replacing the discounted cumulative award from vanilla policy gradients with the Advantage function:
+
+<p align="center">
+  <img src="https://spinningup.openai.com/en/latest/_images/math/ada1266646d71c941e77e3fd41bba9d92d06b7c2.svg">
+</p>
+
+On each learning step, we update both the Actor parameter and the Critic parameter.
 
 ### Policy Proximal Optimization (PPO)
+In many Policy Gradient Methods, policy updates are unstable because of larger step size, which leads to bad policy updates and when this new bad policy is used for learning then it leads to even worse policy. Moreover, many learning methods learn from current experience and discard the experiences after gradient updates. This makes the learning process slow as a neural net takes lots of data to learn, which is inneficient regardding data. PPO overcomes those issues.
+
 
 
 ## Experiment Setup
@@ -63,7 +80,17 @@ PyTorch, OpenAI Gym, TensorBoard, GitHub,
 ## Results
 Results for the different envs/algorithms.
 
+## Execution Instructions
+
 ## Next Steps
 
 
 ## Conclusions
+
+## References
+Proximal Policy Optimization Algorithms
+John Schulman, Filip Wolski, Prafulla Dhariwal, Alec Radford, Oleg Klimov
+OpenAI https://arxiv.org/pdf/1707.06347.pdf
+
+https://openai.com/blog/openai-baselines-ppo/
+https://towardsdatascience.com/proximal-policy-optimization-ppo-with-tensorflow-2-x-89c9430ecc26
