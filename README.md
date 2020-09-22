@@ -6,7 +6,7 @@
 
 ### Advisor: Dani Fojo
 
-## Index:
+## Index
   - Introduction
   - Hypothesis
   - Experiment Setup
@@ -22,7 +22,7 @@ In this project we will implement different Reinforcement Learning (RL) algorith
 ## Hypothesis
 In Reinforcement Learning we have an agent in an unknown environment and this agent can obtain some rewards by interacting with the environment. The agent ought to take actions so as to maximize cumulative rewards. In our case the agent will try to solve an environment from OpenAI Gym. Below we list the ones which we have solved:
 - *Cart Pole.* A pole is attached by an un-actuated joint to a cart, which moves along a frictionless track. The system is controlled by applying a force of +1 or -1 to the cart. The pendulum starts upright, and the goal is to prevent it from falling over. A reward of +1 is provided for every timestep that the pole remains upright. The episode ends when the pole is more than 15 degrees from vertical, or the cart moves more than 2.4 units from the center.
-- *Atari Lunar Lander.* Landing pad is always at coordinates (0,0). Coordinates are the first two numbers in state vector. Reward for moving from the top of the screen to landing pad and zero speed is about 100..140 points. If lander moves away from landing pad it loses reward back. Episode finishes if the lander crashes or comes to rest, receiving additional -100 or +100 points. Each leg ground contact is +10. Firing main engine is -0.3 points each frame. Solved is 200 points. Landing outside landing pad is possible. Fuel is infinite, so an agent can learn to fly and then land on its first attempt. Four discrete actions available: do nothing, fire left orientation engine, fire main engine, fire right orientation engine.
+- *Lunar Lander.* Landing pad is always at coordinates (0,0). Coordinates are the first two numbers in state vector. Reward for moving from the top of the screen to landing pad and zero speed is about 100..140 points. If lander moves away from landing pad it loses reward back. Episode finishes if the lander crashes or comes to rest, receiving additional -100 or +100 points. Each leg ground contact is +10. Firing main engine is -0.3 points each frame. Solved is 200 points. Landing outside landing pad is possible. Fuel is infinite, so an agent can learn to fly and then land on its first attempt. Four discrete actions available: do nothing, fire left orientation engine, fire main engine, fire right orientation engine.
 - *Atari Breakout.* Maximize your score in the Atari 2600 game Breakout. In this environment, the observation is the RAM of the Atari machine, consisting of (only!) 128 bytes. Each action is repeatedly performed for a duration of k frames, where k is uniformly sampled from {2,3,4}.
 
 <p align="center">
@@ -63,7 +63,7 @@ Both Actor and Critic run in parallel. As we have two models that need to be tra
   <img src="https://cdn-media-1.freecodecamp.org/images/1*KlX2-kNXRYLAYpdnI8VPiA.png">
 </p>
 
-In Advantage Actor Critic (A2C) we introduce an advantage function, which will tell us the improvement compared to the average the action taken at that state is. In other words, this function calculates the extra reward the agent gets if I take this action. The extra reward is that beyond the expected value of that state. The Advantage functions is as follows **Aπ(s,a)=Qπ(s,a)−Vπ(s)**.
+In Advantage Actor Critic (A2C) we introduce an advantage function, which will tell us the improvement compared to the average the action taken at that state is. In other words, this function calculates the extra reward the agent gets if I take this action. The extra reward is that beyond the expected value of that state. The Advantage functions is as follows: **Aπ(s,a)=Qπ(s,a)−Vπ(s)**.
 
 Recall the new update equation, replacing the discounted cumulative award from vanilla policy gradients with the Advantage function:
 
@@ -117,14 +117,30 @@ The specifications of the machine where we run our experiments are as follows:
 
 
 ## Results
-Results for the different envs/algorithms.
+### Vanilla Policy Gradients (VPG)
+
+### Advantage Actor Critic (A2C)
+
+### Proximal Policy Optimization (PPO)
+#### Cart Pole
+
+#### Lunar Lander
+
+#### Atari Breakout
+
+
 
 ## Execution Instructions
+
+
 
 ## Next Steps
 
 
+
 ## Conclusions
+
+
 
 ## References
 https://lilianweng.github.io/lil-log/2018/02/19/a-long-peek-into-reinforcement-learning.html
@@ -132,3 +148,4 @@ https://arxiv.org/pdf/1707.06347.pdf
 https://openai.com/blog/openai-baselines-ppo/
 https://towardsdatascience.com/proximal-policy-optimization-ppo-with-tensorflow-2-x-89c9430ecc26
 https://gym.openai.com/envs/
+https://medium.com/@jonathan_hui/rl-proximal-policy-optimization-ppo-explained-77f014ec3f12
