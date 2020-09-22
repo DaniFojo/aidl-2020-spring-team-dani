@@ -72,9 +72,46 @@ On each learning step, we update both the Actor parameter and the Critic paramet
 ### Policy Proximal Optimization (PPO)
 In many Policy Gradient Methods, policy updates are unstable because of larger step size, which leads to bad policy updates and when this new bad policy is used for learning then it leads to even worse policy. Moreover, many learning methods learn from current experience and discard the experiences after gradient updates. This makes the learning process slow as a neural net takes lots of data to learn, which is inneficient regardding data. PPO overcomes those issues.
 
+Now instead of the log of current policy, we will be taking the ratio of current policy and old policy.
 
+<p align="center">
+  <img src="https://miro.medium.com/max/377/1*Zgk2-ZhrDPzFI0ZYCxHc4A.png">
+</p>
+
+We will be also clipping the ratio and will the minimum of the two i.e b/w clipped and unclipped.
+
+<p align="center">
+  <img src="https://miro.medium.com/max/627/1*2-rWCA-oqVxsw-MnVd_lKQ.png">
+</p>
+
+where epsilon is a hyperparameter. The motivation for this objective is as follows. The first term inside the min is L^CPI . The second term, modifies the surrogate objective by clipping the probability ratio, which removes the incentive for moving rt outside of the interval [1 − eps, 1 + eps]. Finally, we take the minimum of the clipped and unclipped objective, so the final objective is a lower bound (i.e., a pessimistic bound) on the unclipped objective. With this scheme, we only ignore the change in probability ratio when it would make the objective improve, and we include it when it makes the objective worse.
+
+
+<p align="center">
+  <img src="https://miro.medium.com/max/788/1*VN01Obh5VyJ6QuA0qfyq6w.png">
+</p>
 
 ## Experiment Setup
+We developed our experiments using Python3 and the PyTorch library for the Deep Learning models (among others). 
+
+In our experiments we developed different algorithms in order to solve the following environments from OpenAI:
+- [CartPole-v1](https://gym.openai.com/envs/CartPole-v1/)
+- [LunarLander-v2](https://gym.openai.com/envs/LunarLander-v2/)
+- [Breakout-ram-v0](https://gym.openai.com/envs/Breakout-ram-v0/)
+- [Breakout-v0](https://gym.openai.com/envs/Breakout-v0/)
+
+We used [TensorBoard](https://www.tensorflow.org/tensorboard/) in order to see the performance of our models.
+
+The specifications of the machine where we run our experiments are as follows:
+
+GPU:
+
+
+
+CPU:
+
+
+
 PyTorch, OpenAI Gym, TensorBoard, GitHub, 
 
 ## Results
@@ -88,9 +125,8 @@ Results for the different envs/algorithms.
 ## Conclusions
 
 ## References
-Proximal Policy Optimization Algorithms
-John Schulman, Filip Wolski, Prafulla Dhariwal, Alec Radford, Oleg Klimov
-OpenAI https://arxiv.org/pdf/1707.06347.pdf
-
+https://lilianweng.github.io/lil-log/2018/02/19/a-long-peek-into-reinforcement-learning.html
+https://arxiv.org/pdf/1707.06347.pdf
 https://openai.com/blog/openai-baselines-ppo/
 https://towardsdatascience.com/proximal-policy-optimization-ppo-with-tensorflow-2-x-89c9430ecc26
+https://gym.openai.com/envs/
