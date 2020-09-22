@@ -36,7 +36,11 @@ Below we find some key concepts in Reinforcement Learning we will be using in th
 
 All the algorithms we will be reviewing in this project are on-policy. This means that they se the deterministic outcomes or samples from the target policy to train the algorithm.
 
-The goal of Reinforcement Learning (RL) is to learn a good strategy for the agent from experimental trials and relative simple feedback received. With the optimal strategy, the agent is capable to actively adapt to the environment to maximize future rewards. Let's review the three RL algorithms we implemented for this project.
+The goal of Reinforcement Learning (RL) is to learn a good strategy for the agent from experimental trials and relative simple feedback received. With the optimal strategy, the agent is capable to actively adapt to the environment to maximize future rewards. 
+
+Note that all the environments that we are going to solve are discrete, which means that the action space allows a fixed range of non-negative numbers. In case we wanted to develop algorithms to solve continuous environments, we should take a look to the [Bellman Equations](https://lilianweng.github.io/lil-log/2018/02/19/a-long-peek-into-reinforcement-learning.html#bellman-equations). 
+
+Let's review the three RL algorithms we implemented for this project.
 
 ### Vanilla Policy Gradient
 The key idea underlying policy gradients is to push up the probabilities of actions that lead to higher return, and push down the probabilities of actions that lead to lower return, until you arrive at the optimal policy.
@@ -104,15 +108,13 @@ We used [TensorBoard](https://www.tensorflow.org/tensorboard/) in order to see t
 
 The specifications of the machine where we run our experiments are as follows:
 
-GPU:
+### GPU
+![GPU](/images/GPU.png)
 
 
+### CPU
+![CPU](/images/CPU.JPG)
 
-CPU:
-
-
-
-PyTorch, OpenAI Gym, TensorBoard, GitHub, 
 
 ## Results
 Results for the different envs/algorithms.
