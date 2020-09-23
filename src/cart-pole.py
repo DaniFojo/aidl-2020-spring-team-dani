@@ -83,7 +83,7 @@ for i_episode in range(number_of_episodes):
     observation = env.reset()
     score = 0
     for t in range(max_episode_length):
-        env.render()
+        # env.render()
 
         input = F.Tensor(observation).to(device)
 
