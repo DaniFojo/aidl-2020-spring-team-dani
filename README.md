@@ -117,16 +117,31 @@ The specifications of the machine where we run our experiments are as follows:
 
 
 ## Results
-### Vanilla Policy Gradients (VPG)
+The goal of this project is to achieve solving Atari games from OpenAI Gym applying the PPO algorithm. In order to do that, we first implemented VPG, then A2C and finally PPO in order to understand how RL algorithms work. You can find the different implementations in this repository.
 
-### Advantage Actor Critic (A2C)
+In this section we will analyze the results of our PPO implementation for different OpenAI Gym environments.
 
-### Proximal Policy Optimization (PPO)
-#### Cart Pole
+### Cart Pole
+In this implementation we used an Actor-Critic architecture as the agent for the PPO. "Considered solved when the average return is greater than or equal to 195.0 over 100 consecutive trials." 
 
-#### Lunar Lander
+![Cart Pole](/images/tb_cart_pole_ppo.png)
 
-#### Atari Breakout
+### Lunar Lander
+In this implementation we used an Actor-Critic architecture as the agent for the PPO. "Landing outside the landing pad is possible. Fuel is infinite, so an agent can learn to fly and then land on its first attempt."
+![Lunar Lander](/images/tb_lunar_lander_ppo.png)
+
+### Atari Breakout
+In this case we are just using an Actor. The input to the model are four stacked frames (in order to get the movement of the screen) and the actor is built with convolutional networks.
+![Breakout](/images/tb_breakout_ppo_100k.png)
+![Breakout](/images/tb_breakout_ppo_200k.png)
+![Breakout](/images/tb_breakout_ppo_300k.png)
+
+### Other solved Atari environments
+With our PPO implementation we were able to solve other atari environments as Pong or Space Invaders.
+![Pong](/images/tb_pong_ppo.JPG)
+
+![Space Invaders](/images/tb_space_invaders_ppo.JPG)
+
 
 
 
@@ -143,9 +158,14 @@ The specifications of the machine where we run our experiments are as follows:
 
 
 ## References
-https://lilianweng.github.io/lil-log/2018/02/19/a-long-peek-into-reinforcement-learning.html
-https://arxiv.org/pdf/1707.06347.pdf
-https://openai.com/blog/openai-baselines-ppo/
-https://towardsdatascience.com/proximal-policy-optimization-ppo-with-tensorflow-2-x-89c9430ecc26
-https://gym.openai.com/envs/
-https://medium.com/@jonathan_hui/rl-proximal-policy-optimization-ppo-explained-77f014ec3f12
+- https://lilianweng.github.io/lil-log/2018/02/19/a-long-peek-into-reinforcement-learning.html
+- https://arxiv.org/pdf/1707.06347.pdf
+- https://openai.com/blog/openai-baselines-ppo/
+- https://towardsdatascience.com/proximal-policy-optimization-ppo-with-tensorflow-2-x-89c9430ecc26
+- https://gym.openai.com/envs/
+- https://medium.com/@jonathan_hui/rl-proximal-policy-optimization-ppo-explained-77f014ec3f12
+- https://towardsdatascience.com/understanding-actor-critic-methods-931b97b6df3f
+- https://towardsdatascience.com/cartpole-introduction-to-reinforcement-learning-ed0eb5b58288
+- https://spinningup.openai.com/en/latest/algorithms/ppo.html#documentation-pytorch-version
+- https://arxiv.org/pdf/2006.05990.pdf#page=9&zoom=100,144,332
+- https://arxiv.org/pdf/1506.02438.pdf
