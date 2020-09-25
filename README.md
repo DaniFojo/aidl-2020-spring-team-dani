@@ -12,7 +12,6 @@
   - Experiment Setup
   - Results
   - Execution Instructions
-  - Next Steps
   - Conclusions
 
 
@@ -125,31 +124,41 @@ In this section we will analyze the results of our PPO implementation for differ
 In this implementation we used an Actor-Critic architecture as the agent for the PPO. "Considered solved when the average return is greater than or equal to 195.0 over 100 consecutive trials." 
 
 ![Cart Pole](/images/tb_cart_pole_ppo.png)
+![Cart Pole](/images/cartpole.gif)
 
 ### Lunar Lander
 In this implementation we used an Actor-Critic architecture as the agent for the PPO. "Landing outside the landing pad is possible. Fuel is infinite, so an agent can learn to fly and then land on its first attempt."
 ![Lunar Lander](/images/tb_lunar_lander_ppo.png)
+![Lunar Lander](/images/lunar.gif)
+
 
 ### Atari Breakout
 In this case we are just using an Actor. The input to the model are four stacked frames (in order to get the movement of the screen) and the actor is built with convolutional networks.
 ![Breakout](/images/tb_breakout_ppo_100k.png)
 ![Breakout](/images/tb_breakout_ppo_200k.png)
 ![Breakout](/images/tb_breakout_ppo_300k.png)
+![Breakout](/images/breakout.gif)
 
 ### Other solved Atari environments
 With our PPO implementation we were able to solve other atari environments as Pong or Space Invaders.
-![Pong](/images/tb_pong_ppo.JPG)
+![Pong](/images/tb_pong_ppo.png)
+![Pong](/images/pong.gif)
 
-![Space Invaders](/images/tb_space_invaders_ppo.JPG)
-
+![Space Invaders](/images/tb_space_invaders_ppo.png)
+![Space Invaders](/images/invaders.gif)
 
 
 
 ## Execution Instructions
+### Dependencies
+In order to run experiments with our PPO implementation, the needed dependencies need to be installed. Running the shell script [install.sh](https://github.com/DaniFojo/aidl-2020-spring-team-dani/blob/master/install.sh) all dependencies will be installed.
 
+### Running Experiments
+In this repository we will find different different execution scripts, depending on the PPO implementation and the environment we want to try. Our final results are based on the async implementation, so we will focus on the scripts located in [this folder](https://github.com/DaniFojo/aidl-2020-spring-team-dani/tree/master/src/ppo/async).
 
+We have different execution scripts for each environment. In order to test different hyperparameters for training, the 'train' flag has to be 'True' and then we can change the hyperparameters. In case we want to test a trained model, we will execute the script with 'train=False' and in the 'model_file' parameter we will locate the model that we want to test.
 
-## Next Steps
+In case we want to train a model to play in a different Atari environment, we can change it in the 'game' parameters, where we will put the name of the environment that we want to test.
 
 
 
