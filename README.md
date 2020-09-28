@@ -157,6 +157,7 @@ In order to run experiments with our PPO implementation, the needed dependencies
 In this repository we will find different different execution scripts, depending on the PPO implementation and the environment we want to try. Our final results are based on the async implementation, so we will focus on the scripts located in [this folder](https://github.com/DaniFojo/aidl-2020-spring-team-dani/tree/master/src/ppo/async).
 
 We have different execution scripts for each environment. In order to test different hyperparameters for training, the 'train' flag has to be 'True' and then we can change the hyperparameters. In case we want to test a trained model, we will execute the script with 'train=False' and in the 'model_file' parameter we will locate the model that we want to test.
+If you want to use a pre-trained model you can use the models located in [this folder](https://github.com/DaniFojo/aidl-2020-spring-team-dani/tree/master/model)
 
 In case we want to train a model to play in a different Atari environment, we can change it in the 'game' parameters, where we will put the name of the environment that we want to test.
 
