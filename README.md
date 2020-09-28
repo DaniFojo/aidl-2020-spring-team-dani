@@ -163,8 +163,15 @@ In case we want to train a model to play in a different Atari environment, we ca
 
 
 ## Conclusions
+It has been a very challenging project and we have learned a lot. One of the first issues we faced is the hardware limitation. It took a lot of time to train the models, and the batch size was also limited to the hardware compute power.
 
+We have observed that in PPO with A2C the models were training successfully in simple environments, but when complexity was increased (Atari) we needed more episodes and we didn't get a model avble to solve the environments. This was solved using the environments frames (images) instead of the RAM as input data. Using this approach we observed that training finishes for less episodes in Pong and Space Invaders, but for Breakout the model is not able to finish the game. We suspect that this could be overfitting, and a way to solve that could be increasing the batch size, but this takes us back to the hardware limitation.
 
+We have seen that it is very important to monitor the performance of the models with tools like TensorBoard. All the tests we made took us to other monitoring techniques like observing how each hyperparameter affected the result. Both monitoring and testing different techniques led us to the final algorithm, with which we would be able to train models able to solve Atari environments.
+
+During this project we have had the opportunity of learning how to implement Reinforcement Learning algorithms gradually, starting with Vanilla Policy Gradients, then Advantage Actor Critic and finallty PPO, being able to train models that are able to solve different Atari games. It has been very challenging, specially with PPO, as there are a lot of factors that have to be taken into account :hyperparameters, different architectures, read different papers in order to learn techniques that could improve the performance of our model...
+
+Deep learning has a huge community behind it, which makes it easier to find a solution to your problem. However, bulding deep learning models can lead you to a very specific problem to your case and it won't be that easy to solve it.
 
 ## References
 - https://lilianweng.github.io/lil-log/2018/02/19/a-long-peek-into-reinforcement-learning.html
@@ -176,5 +183,15 @@ In case we want to train a model to play in a different Atari environment, we ca
 - https://towardsdatascience.com/understanding-actor-critic-methods-931b97b6df3f
 - https://towardsdatascience.com/cartpole-introduction-to-reinforcement-learning-ed0eb5b58288
 - https://spinningup.openai.com/en/latest/algorithms/ppo.html#documentation-pytorch-version
-- https://arxiv.org/pdf/2006.05990.pdf#page=9&zoom=100,144,332
+- https://arxiv.org/pdf/2006.05990.pdf
 - https://arxiv.org/pdf/1506.02438.pdf
+- https://arxiv.org/pdf/1605.01335.pdf
+- https://arxiv.org/pdf/1910.06764.pdf
+- https://arxiv.org/pdf/1707.06347.pdf
+- https://medium.com/@jonathan_hui/rl-policy-gradients-explained-advanced-topic-20c2b81a9a8b
+- https://arxiv.org/pdf/1602.01783.pdf
+- https://github.com/bsivanantham/GAE
+- https://towardsdatascience.com/proximal-policy-optimization-tutorial-part-1-actor-critic-method-d53f9afffbf6- 
+- https://towardsdatascience.com/proximal-policy-optimization-tutorial-part-2-2-gae-and-ppo-loss-fe1b3c5549e8
+- https://towardsdatascience.com/applications-of-reinforcement-learning-in-real-world-1a94955bcd12
+
