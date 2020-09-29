@@ -191,80 +191,55 @@ Deep learning has a huge community behind it, which makes it easier to find a so
 
 ## References
 
-Learning from the memory of Atari 2600
-https://arxiv.org/pdf/1605.01335.pdf
+[Learning from the memory of Atari 2600](https://arxiv.org/pdf/1605.01335.pdf)
 
-High-dimensional Continuous Control Using Generalized Advantage Estimation
-https://arxiv.org/pdf/1506.02438.pdf
+[High-dimensional Continuous Control Using Generalized Advantage Estimation](https://arxiv.org/pdf/1506.02438.pdf)
 
-What Matters In On-Policy Reinforcement Learning? A Large-Scale Empirical Study
-https://arxiv.org/pdf/2006.05990.pdf
+[What Matters In On-Policy Reinforcement Learning? A Large-Scale Empirical Study](https://arxiv.org/pdf/2006.05990.pdf)
 
-Stabilizing Transformers For Reinforcement Learning
-https://arxiv.org/pdf/1910.06764.pdf
+[Stabilizing Transformers For Reinforcement Learning](https://arxiv.org/pdf/1910.06764.pdf)
 
-RL — Proximal Policy Optimization (PPO) Explained | by Jonathan Hui
-https://medium.com/@jonathan_hui/rl-proximal-policy-optimization-ppo-explained-77f014ec3f12
+[RL — Proximal Policy Optimization (PPO) Explained | by Jonathan Hui](https://medium.com/@jonathan_hui/rl-proximal-policy-optimization-ppo-explained-77f014ec3f12)
 
-A (Long) Peek into Reinforcement Learning
-https://lilianweng.github.io/lil-log/2018/02/19/a-long-peek-into-reinforcement-learning.html
+[A (Long) Peek into Reinforcement Learning](https://lilianweng.github.io/lil-log/2018/02/19/a-long-peek-into-reinforcement-learning.html)
 
-Proximal Policy Optimization Algorithms
-https://arxiv.org/pdf/1707.06347.pdf
+[Proximal Policy Optimization Algorithms](https://arxiv.org/pdf/1707.06347.pdf)
 
-Proximal Policy Optimization
-https://openai.com/blog/openai-baselines-ppo/
+[Proximal Policy Optimization](https://openai.com/blog/openai-baselines-ppo/)
 
-Proximal Policy Optimization (PPO)
-https://towardsdatascience.com/proximal-policy-optimization-ppo-with-tensorflow-2-x-89c9430ecc26
+[Proximal Policy Optimization (PPO)](https://towardsdatascience.com/proximal-policy-optimization-ppo-with-tensorflow-2-x-89c9430ecc26)
 
-RL — Proximal Policy Optimization (PPO) Explained
-https://medium.com/@jonathan_hui/rl-proximal-policy-optimization-ppo-explained-77f014ec3f12
+[RL — Proximal Policy Optimization (PPO) Explained](https://medium.com/@jonathan_hui/rl-proximal-policy-optimization-ppo-explained-77f014ec3f12)
 
-Understanding Actor Critic Methods and A2C
-https://towardsdatascience.com/understanding-actor-critic-methods-931b97b6df3f
+[Understanding Actor Critic Methods and A2C](https://towardsdatascience.com/understanding-actor-critic-methods-931b97b6df3f)
 
-Cartpole - Introduction to Reinforcement Learning (DQN - Deep Q-Learning)
-https://towardsdatascience.com/cartpole-introduction-to-reinforcement-learning-ed0eb5b58288
+[Cartpole - Introduction to Reinforcement Learning (DQN - Deep Q-Learning)](https://towardsdatascience.com/cartpole-introduction-to-reinforcement-learning-ed0eb5b58288)
 
-Docs » Proximal Policy Optimization
-https://spinningup.openai.com/en/latest/algorithms/ppo.html#documentation-pytorch-version
+[Docs » Proximal Policy Optimization](https://spinningup.openai.com/en/latest/algorithms/ppo.html#documentation-pytorch-version)
 
-RL — Policy Gradient Explained
-https://medium.com/@jonathan_hui/rl-policy-gradients-explained-9b13b688b146
+[RL — Policy Gradient Explained](https://medium.com/@jonathan_hui/rl-policy-gradients-explained-9b13b688b146)
 
-RL — Policy Gradients Explained (Part 2)
-https://medium.com/@jonathan_hui/rl-policy-gradients-explained-advanced-topic-20c2b81a9a8b
+[RL — Policy Gradients Explained (Part 2)](https://medium.com/@jonathan_hui/rl-policy-gradients-explained-advanced-topic-20c2b81a9a8b)
 
-Asynchronous Methods for Deep Reinforcement Learning
-https://arxiv.org/pdf/1602.01783.pdf
+[Asynchronous Methods for Deep Reinforcement Learning](https://arxiv.org/pdf/1602.01783.pdf)
 
-Reinforcement learning algorithms with Generalized Advantage Estimation
-https://github.com/bsivanantham/GAE
+[Reinforcement learning algorithms with Generalized Advantage Estimation](https://github.com/bsivanantham/GAE)
 
-Proximal Policy Optimization Tutorial (Part 1/2: Actor-Critic Method)
-https://towardsdatascience.com/proximal-policy-optimization-tutorial-part-1-actor-critic-method-d53f9afffbf6
+[Proximal Policy Optimization Tutorial (Part 1/2: Actor-Critic Method)](https://towardsdatascience.com/proximal-policy-optimization-tutorial-part-1-actor-critic-method-d53f9afffbf6)
 
-Proximal Policy Optimization Tutorial (Part 2/2: GAE and PPO loss)
-https://towardsdatascience.com/proximal-policy-optimization-tutorial-part-2-2-gae-and-ppo-loss-fe1b3c5549e8
+[Proximal Policy Optimization Tutorial (Part 2/2: GAE and PPO loss)](https://towardsdatascience.com/proximal-policy-optimization-tutorial-part-2-2-gae-and-ppo-loss-fe1b3c5549e8)
 
-Applications of Reinforcement Learning in Real World
-https://towardsdatascience.com/applications-of-reinforcement-learning-in-real-world-1a94955bcd12
+[Applications of Reinforcement Learning in Real World](https://towardsdatascience.com/applications-of-reinforcement-learning-in-real-world-1a94955bcd12)
 
-Human-level control through deep reinforcement learning
-https://storage.googleapis.com/deepmind-media/dqn/DQNNaturePaper.pdf
+[Human-level control through deep reinforcement learning](https://storage.googleapis.com/deepmind-media/dqn/DQNNaturePaper.pdf)
 
-Playing Atari with Deep Reinforcement Learning
-https://deepmind.com/research/publications/playing-atari-deep-reinforcement-learning
+[Playing Atari with Deep Reinforcement Learning](https://deepmind.com/research/publications/playing-atari-deep-reinforcement-learning)
 
-UC Berkeley Reward-Free RL Beats SOTA Reward-Based RL
-https://syncedreview-com.cdn.ampproject.org/v/s/syncedreview.com/2020/09/21/uc-berkeley-reward-free-rl-beats-sota-reward-based-rl/amp/?usqp=mq331AQFKAGwASA%3D&amp_js_v=0.1#referrer=https%3A%2F%2Fwww.google.com&amp_tf=De%20%251%24s&ampshare=https%3A%2F%2Fsyncedreview.com%2F2020%2F09%2F21%2Fuc-berkeley-reward-free-rl-beats-sota-reward-based-rl%2F
+[UC Berkeley Reward-Free RL Beats SOTA Reward-Based RL](https://syncedreview-com.cdn.ampproject.org/v/s/syncedreview.com/2020/09/21/uc-berkeley-reward-free-rl-beats-sota-reward-based-rl/amp/?usqp=mq331AQFKAGwASA%3D&amp_js_v=01#referrer=https%3A%2F%2Fwww.google.com&amp_tf=De%20%251%24s&ampshare=https%3A%2F%2Fsyncedreview.com%2F2020%2F09%2F21%2Fuc-berkeley-reward-free-rl-beats-sota-reward-based-rl%2F)
 
-From 0 to 200 - lessons learned from solving Atari Breakout with Reinforcement Learning
-http://blog.jzhanson.com/blog/rl/project/2018/05/28/breakout.html
+[From 0 to 200 - lessons learned from solving Atari Breakout with Reinforcement Learning](http://blog.jzhanson.com/blog/rl/project/2018/05/28/breakout.html)
 
-ACCELERATED METHODS FOR DEEP REINFORCEMENT LEARNING
-https://arxiv.org/pdf/1803.02811.pdf
+[ACCELERATED METHODS FOR DEEP REINFORCEMENT LEARNING](https://arxiv.org/pdf/1803.02811.pdf)
 
 ## Presentation
 
