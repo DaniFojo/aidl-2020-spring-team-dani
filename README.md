@@ -212,6 +212,8 @@ Deep learning has a huge community behind it, which makes it easier to find a so
 
 ## Presentation
 
-![Presentation 29-9-2020](/presentation/aidl_presentation_breakout.pptx)
+[Presentation (PPTX 29-9-2020)](/presentation/aidl_presentation_breakout.pptx)
 
-![Presentation (latest)](https://docs.google.com/presentation/d/15Fdu86SqXk07pGEvxz5FZPpUEyuPUffezvqd6eWLsdA/edit#slide=id.p)
+[Presentation (PDF 29-9-2020)](/presentation/aidl_presentation_breakout.pptx)
+
+[Presentation (latest)](https://docs.google.com/presentation/d/15Fdu86SqXk07pGEvxz5FZPpUEyuPUffezvqd6eWLsdA/edit#slide=id.p)
